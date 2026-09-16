@@ -52,6 +52,11 @@ class MediaListModel(QAbstractListModel):
         names[self.RejectedRole] = b"rejected"
         return names
 
+    def row_at(self, row: int) -> dict[str, object] | None:
+        if 0 <= row < len(self._rows):
+            return dict(self._rows[row])
+        return None
+
     def set_rows(self, rows: Sequence[Mapping[str, object]]) -> None:
         self.beginResetModel()
         self._rows = [dict(row) for row in rows]
