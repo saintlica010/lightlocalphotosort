@@ -7,6 +7,8 @@ from pathlib import Path
 from local_media_curator.domain.ordering import next_sort_key
 from local_media_curator.domain.paths import normalize_path
 
+_IN_CHUNK = 400
+
 _SORT_EXPRESSIONS = {
     "file_name": "file_name COLLATE NOCASE",
     "captured_at": "captured_at",
@@ -377,14 +379,26 @@ class ListRepository:
         )
 
     def list_names_for_media(self, media_id: int) -> list[str]:
-        rows = self._conn.execute(
-            """
-            SELECT lists.name
-            FROM list_items
-            JOIN lists ON lists.id = list_items.list_id
-            WHERE list_items.media_id = ?
-            ORDER BY lists.name
-            """,
-            (media_id,),
-        )
-        return [str(row[0]) for row in rows]
+        return self.list_names_for_media_ids([media_id]).get(media_id, [])
+
+    def list_names_for_media_ids(self, media_ids: list[int]) -> dict[int, list[str]]:
+        mapping: dict[int, list[str]] = {int(media_id): [] for media_id in media_ids}
+        if not media_ids:
+            return mapping
+        unique_ids = list(dict.fromkeys(int(media_id) for media_id in media_ids))
+        for start in range(0, len(unique_ids), _IN_CHUNK):
+            chunk = unique_ids[start : start + _IN_CHUNK]
+            placeholders = ",".join("?" * len(chunk))
+            rows = self._conn.execute(
+                f"""
+                SELECT list_items.media_id, lists.name
+                FROM list_items
+                JOIN lists ON lists.id = list_items.list_id
+                WHERE list_items.media_id IN ({placeholders})
+                ORDER BY lists.name COLLATE NOCASE, lists.id
+                """,
+                tuple(chunk),
+            )
+            for row in rows:
+                mapping[int(row[0])].append(str(row[1]))
+        return mapping

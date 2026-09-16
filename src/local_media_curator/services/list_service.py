@@ -128,6 +128,9 @@ class ListService:
     def list_names_for_media(self, media_id: int) -> list[str]:
         return self._lists.list_names_for_media(media_id)
 
+    def list_names_for_media_ids(self, media_ids: list[int]) -> dict[int, list[str]]:
+        return self._lists.list_names_for_media_ids(media_ids)
+
     def items_with_sort_keys(self, list_id: int) -> list[tuple[int, int]]:
         return self._lists.items_with_sort_keys(list_id)
 

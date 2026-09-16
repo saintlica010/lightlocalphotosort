@@ -163,3 +163,47 @@ def test_library_panel_exposes_sort_combo(qtbot) -> None:
         "file_size",
         "imported_at",
     ]
+
+
+def test_grid_reload_does_not_issue_per_item_list_name_queries(
+    qtbot, tmp_path: Path
+) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "src"
+    source.mkdir()
+    for name in ("A.jpg", "B.jpg", "C.jpg"):
+        Image.new("RGB", (10, 10)).save(source / name, "JPEG")
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    window.add_source_folder(source)
+    window.scan()
+    qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 3, timeout=8000)
+    list_id = window.list_service.create("Promotional")
+    ids = [
+        int(window.media_grid.model.row_at(i)["id"])
+        for i in range(window.media_grid.model.rowCount())
+    ]
+    window.add_items_to_list(list_id, ids[:2])
+    # Python 3.14: sqlite3.Connection.execute is immutable; wrap the repo connection.
+    real_conn = window.list_service._lists._conn
+    seen: list[str] = []
+
+    class _ExecuteProbe:
+        def execute(self, sql, parameters=()):
+            text = str(sql)
+            if "list_items" in text and "lists" in text:
+                seen.append(text)
+            return real_conn.execute(sql, parameters)
+
+        def __getattr__(self, name: str):
+            return getattr(real_conn, name)
+
+    window.list_service._lists._conn = _ExecuteProbe()  # type: ignore[assignment]
+    window.show_library_view("all")
+    membership_queries = [
+        sql for sql in seen if "list_items" in sql and "lists" in sql
+    ]
+    assert len(membership_queries) <= 1
+    assert window.media_grid.model.rowCount() == 3
+    project.close()

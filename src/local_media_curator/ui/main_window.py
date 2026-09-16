@@ -606,8 +606,18 @@ class MainWindow(QMainWindow):
             return
         items = self._media_for_current_view()
         list_mode = self._view_mode == "list"
+        media_ids = [item.id for item in items]
+        names_by_id = (
+            self.list_service.list_names_for_media_ids(media_ids)
+            if self.list_service is not None
+            else {}
+        )
         rows = [
-            self._row_from_media(item, ordinal if list_mode else None)
+            self._row_from_media(
+                item,
+                ordinal if list_mode else None,
+                names_by_id.get(item.id, []),
+            )
             for ordinal, item in enumerate(items, start=1)
         ]
         jobs = self._thumbnail_jobs(items, rows)
@@ -651,12 +661,9 @@ class MainWindow(QMainWindow):
             sort_by=self._sort_by,
         )
 
-    def _row_from_media(self, media: Media, ordinal: int | None) -> dict[str, object]:
-        lists = (
-            self.list_service.list_names_for_media(media.id)
-            if self.list_service is not None
-            else []
-        )
+    def _row_from_media(
+        self, media: Media, ordinal: int | None, lists: list[str]
+    ) -> dict[str, object]:
         return {
             "id": media.id,
             "file_name": media.file_name,

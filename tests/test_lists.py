@@ -216,6 +216,21 @@ def test_add_items_preserves_independent_append_order(tmp_path: Path) -> None:
     project.close()
 
 
+def test_list_names_for_media_ids_bulk(tmp_path: Path) -> None:
+    project, lists, ids, _source = _setup(tmp_path, ("A.jpg", "B.jpg", "C.jpg"))
+    promo = lists.create("Promotional")
+    web = lists.create("Website")
+    lists.add_items(promo, [ids["A.jpg"], ids["B.jpg"]])
+    lists.add_items(web, [ids["A.jpg"]])
+    mapping = lists.list_names_for_media_ids(
+        [ids["A.jpg"], ids["B.jpg"], ids["C.jpg"]]
+    )
+    assert mapping[ids["A.jpg"]] == ["Promotional", "Website"]
+    assert mapping[ids["B.jpg"]] == ["Promotional"]
+    assert mapping[ids["C.jpg"]] == []
+    project.close()
+
+
 def test_main_window_library_panel_hosts_list_panel(qtbot) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
