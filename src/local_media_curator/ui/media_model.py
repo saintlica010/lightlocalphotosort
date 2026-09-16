@@ -61,3 +61,14 @@ class MediaListModel(QAbstractListModel):
         self.beginResetModel()
         self._rows = [dict(row) for row in rows]
         self.endResetModel()
+
+    def set_thumbnail_path(self, media_id: int, path: str) -> None:
+        wanted = int(media_id)
+        for row_index, row in enumerate(self._rows):
+            value = row.get("id")
+            if value is None or int(value) != wanted:
+                continue
+            row["thumbnail_path"] = path
+            index = self.index(row_index)
+            self.dataChanged.emit(index, index, [self.ThumbnailPathRole])
+            return

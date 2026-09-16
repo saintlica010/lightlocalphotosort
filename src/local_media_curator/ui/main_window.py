@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter, QWidget
 
 from local_media_curator.domain.models import Media, Project
 from local_media_curator.media.scan_worker import ScanWorker
+from local_media_curator.media.thumbnail_pool import ThumbnailPool
 from local_media_curator.media.thumbnail_service import ThumbnailService
 from local_media_curator.services.library_service import LibraryService
 from local_media_curator.services.list_service import ListService
@@ -33,6 +34,7 @@ class MainWindow(QMainWindow):
         self.list_service: ListService | None = None
         self.rejection_service: RejectionService | None = None
         self.thumbnail_service: ThumbnailService | None = None
+        self.thumbnail_pool: ThumbnailPool | None = None
         self.undo_stack: CurationUndoStack | None = None
         self.list_name_picker: Callable[[list[str]], str | None] | None = None
         self._view_mode = "all"
@@ -72,6 +74,7 @@ class MainWindow(QMainWindow):
         self.list_service = ListService(project)
         self.rejection_service = RejectionService(project)
         self.thumbnail_service = ThumbnailService(project)
+        self._replace_thumbnail_pool(project)
         self.set_undo_stack(CurationUndoStack(project))
         self._view_mode = "all"
         self._current_list_id = None
@@ -108,7 +111,6 @@ class MainWindow(QMainWindow):
 
     def _on_scan_finished(self, _result: object) -> None:
         self._stop_scan_thread()
-        self._ensure_thumbnails()
         self.refresh()
 
     def _on_scan_failed(self, message: str) -> None:
@@ -496,6 +498,7 @@ class MainWindow(QMainWindow):
             self._row_from_media(item, ordinal)
             for ordinal, item in enumerate(items, start=1)
         ]
+        jobs = self._thumbnail_jobs(items, rows)
         self.media_grid.model.set_rows(rows)
         list_mode = self._view_mode == "list"
         self.media_grid.set_manual_order_enabled(list_mode)
@@ -505,6 +508,8 @@ class MainWindow(QMainWindow):
             self.preview_panel.set_media(self.media_grid.model.row_at(current.row()))
         else:
             self.preview_panel.set_media(None)
+        if self.thumbnail_pool is not None and jobs:
+            self.thumbnail_pool.request(jobs)
 
     def _media_for_current_view(self) -> list[Media]:
         assert self.library_service is not None
@@ -544,11 +549,30 @@ class MainWindow(QMainWindow):
             "lists": lists,
         }
 
-    def _ensure_thumbnails(self) -> None:
-        if self.library_service is None:
-            return
-        for media in self.library_service.list_media(include_rejected=True):
-            self._thumbnail_path(media)
+    def _replace_thumbnail_pool(self, project: Project) -> None:
+        previous = self.thumbnail_pool
+        if previous is not None:
+            previous.ready.disconnect(self._on_thumbnail_ready)
+            previous.clear()
+            previous.deleteLater()
+        pool = ThumbnailPool(project, parent=self)
+        pool.ready.connect(self._on_thumbnail_ready)
+        self.thumbnail_pool = pool
+
+    def _thumbnail_jobs(
+        self, items: list[Media], rows: list[dict[str, object]]
+    ) -> list[tuple[int, str]]:
+        jobs: list[tuple[int, str]] = []
+        for media, row in zip(items, rows, strict=True):
+            if row.get("thumbnail_path"):
+                continue
+            if media.media_type != "image" or media.missing:
+                continue
+            path = Path(media.absolute_path)
+            if not path.is_file():
+                continue
+            jobs.append((media.id, str(path)))
+        return jobs
 
     def _thumbnail_path(self, media: Media) -> str | None:
         if self.thumbnail_service is None:
@@ -558,7 +582,11 @@ class MainWindow(QMainWindow):
         path = Path(media.absolute_path)
         if not path.is_file():
             return None
-        return str(self.thumbnail_service.ensure(media.id, path))
+        cached = self.thumbnail_service.cached_path(media.id, path)
+        return str(cached) if cached is not None else None
+
+    def _on_thumbnail_ready(self, media_id: int, path: str) -> None:
+        self.media_grid.model.set_thumbnail_path(int(media_id), path)
 
     def _on_media_current_changed(
         self, current: QModelIndex, _previous: QModelIndex

@@ -25,6 +25,24 @@ def test_thumbnail_written_inside_project_not_source(tmp_path: Path) -> None:
     project.close()
 
 
+def test_cached_path_does_not_render(tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "src"
+    source.mkdir()
+    photo = source / "A.jpg"
+    Image.new("RGB", (40, 40), "blue").save(photo, "JPEG")
+    svc = LibraryService(project)
+    svc.add_source_folder(source)
+    svc.scan()
+    media_id = project.connection.execute("SELECT id FROM media").fetchone()[0]
+    thumbs = ThumbnailService(project)
+    assert thumbs.cached_path(media_id, photo) is None
+    assert not any(project.thumbnails_dir.rglob("*.webp"))
+    out = thumbs.ensure(media_id, photo)
+    assert thumbs.cached_path(media_id, photo) == out
+    project.close()
+
+
 def test_media_list_model_constructs_with_rows(qapp) -> None:
     from local_media_curator.ui.media_model import MediaListModel
 

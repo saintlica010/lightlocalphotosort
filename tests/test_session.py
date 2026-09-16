@@ -31,6 +31,20 @@ def _open_scanned_window(qtbot, tmp_path: Path, names: tuple[str, ...] = ("A.jpg
     return window, project, source
 
 
+def _thumbnails_ready(window: MainWindow, count: int) -> bool:
+    model = window.media_grid.model
+    if model.rowCount() != count:
+        return False
+    for i in range(count):
+        row = model.row_at(i)
+        if row is None:
+            return False
+        path = row.get("thumbnail_path")
+        if not path or not Path(str(path)).is_file():
+            return False
+    return True
+
+
 def test_set_project_scan_populates_grid(qtbot, tmp_path: Path) -> None:
     window, project, source = _open_scanned_window(qtbot, tmp_path)
     model = window.media_grid.model
@@ -42,6 +56,9 @@ def test_set_project_scan_populates_grid(qtbot, tmp_path: Path) -> None:
         assert Path(str(row["absolute_path"])).is_file()
         assert row["rejected"] is False
         assert "ordinal" in row
+    qtbot.waitUntil(lambda: _thumbnails_ready(window, 2), timeout=8000)
+    rows = [model.row_at(i) for i in range(model.rowCount())]
+    for row in rows:
         thumb = Path(str(row["thumbnail_path"]))
         assert thumb.is_file()
         assert project.thumbnails_dir in thumb.parents
