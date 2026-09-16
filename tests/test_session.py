@@ -99,6 +99,7 @@ def test_file_menu_has_project_actions(qtbot) -> None:
     assert "Open Project" in titles
     assert "Add Source Folder" in titles
     assert "Scan" in titles
+    assert "Open Original" in titles
 
 
 def test_library_views_switch_grid(qtbot, tmp_path: Path) -> None:

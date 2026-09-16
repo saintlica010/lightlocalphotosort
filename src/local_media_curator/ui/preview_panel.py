@@ -15,10 +15,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from local_media_curator.media.image_loader import (
-    DEFAULT_PREVIEW_MAX_EDGE,
-    load_preview_image,
-)
+from local_media_curator.media.image_loader import DEFAULT_PREVIEW_MAX_EDGE
+from local_media_curator.media.preview_loader import PreviewLoader, open_path
 
 
 class ImageView(QGraphicsView):
@@ -72,6 +70,10 @@ class ImageView(QGraphicsView):
 class PreviewPanel(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._token = 0
+        self._current_path: Path | None = None
+        self.loader = PreviewLoader(self)
+        self.loader.loaded.connect(self._on_preview_loaded)
         self.image_view = ImageView(self)
         self.file_name_label = QLabel()
         self.path_label = QLabel()
@@ -105,6 +107,7 @@ class PreviewPanel(QWidget):
             return
         path_value = media.get("absolute_path") or media.get("path")
         path_text = str(path_value) if path_value else ""
+        self._current_path = Path(path_text) if path_text else None
         width = media.get("width")
         height = media.get("height")
         size = media.get("file_size")
@@ -124,7 +127,14 @@ class PreviewPanel(QWidget):
         self.rejected_label.setText("Yes" if rejected else "No")
         self._load_preview(path_value)
 
+    def open_original(self) -> None:
+        if self._current_path is None:
+            return
+        open_path(self._current_path)
+
     def _clear(self) -> None:
+        self._token += 1
+        self._current_path = None
         self.file_name_label.clear()
         self.path_label.clear()
         self.dimensions_label.clear()
@@ -136,16 +146,20 @@ class PreviewPanel(QWidget):
         self.image_view.set_image(None)
 
     def _load_preview(self, path_value: object) -> None:
+        self._token += 1
+        token = self._token
+        self.image_view.set_image(None)
         if not path_value:
-            self.image_view.set_image(None)
             return
         path = Path(str(path_value))
         if not path.is_file():
-            self.image_view.set_image(None)
             return
-        self.image_view.set_image(
-            load_preview_image(path, max_edge=DEFAULT_PREVIEW_MAX_EDGE)
-        )
+        self.loader.load(str(path), token, DEFAULT_PREVIEW_MAX_EDGE)
+
+    def _on_preview_loaded(self, token: int, image: object) -> None:
+        if int(token) != self._token:
+            return
+        self.image_view.set_image(image if isinstance(image, QImage) else None)
 
 
 def _format_lists(value: object) -> str:

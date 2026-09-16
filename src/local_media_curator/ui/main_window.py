@@ -223,11 +223,14 @@ class MainWindow(QMainWindow):
         self.scan_action = QAction("Scan", self)
         self.scan_action.setShortcut(QKeySequence(Qt.Key.Key_F5))
         self.scan_action.triggered.connect(self._on_scan)
+        self.open_original_action = QAction("Open Original", self)
+        self.open_original_action.triggered.connect(self._on_open_original)
         file_menu.addAction(new_project)
         file_menu.addAction(open_project_action)
         file_menu.addSeparator()
         file_menu.addAction(self.add_source_action)
         file_menu.addAction(self.scan_action)
+        file_menu.addAction(self.open_original_action)
 
         undo = QAction("Undo", self)
         undo.setShortcut(QKeySequence.StandardKey.Undo)
@@ -360,6 +363,9 @@ class MainWindow(QMainWindow):
 
     def _on_scan(self) -> None:
         self.scan()
+
+    def _on_open_original(self) -> None:
+        self.preview_panel.open_original()
 
     def _on_undo(self) -> None:
         if self.undo_stack is not None:
