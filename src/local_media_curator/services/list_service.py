@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime
 
 from local_media_curator.db.repositories import ListRepository
@@ -80,18 +81,30 @@ class ListService:
 
     def create(self, name: str, description: str | None = None) -> int:
         now = _now_iso()
-        list_id = self._lists.insert(
-            name=name,
-            description=description,
-            created_at=now,
-            updated_at=now,
-        )
-        self._project.connection.commit()
-        return list_id
+        conn = self._project.connection
+        try:
+            list_id = self._lists.insert(
+                name=name,
+                description=description,
+                created_at=now,
+                updated_at=now,
+            )
+            conn.commit()
+            return list_id
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            existing = self._lists.get_by_name(name)
+            if existing is not None:
+                return int(existing["id"])
+            raise
 
     def rename(self, list_id: int, name: str) -> None:
-        self._lists.rename(list_id, name, _now_iso())
-        self._project.connection.commit()
+        conn = self._project.connection
+        try:
+            self._lists.rename(list_id, name, _now_iso())
+            conn.commit()
+        except sqlite3.IntegrityError:
+            conn.rollback()
 
     def delete(self, list_id: int) -> None:
         self._lists.delete(list_id)

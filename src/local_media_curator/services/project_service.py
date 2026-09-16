@@ -9,10 +9,23 @@ from local_media_curator.domain.models import Project
 _DB_NAME = "project.sqlite3"
 _THUMBNAILS_DIR = "thumbnails"
 _LOGS_DIR = "logs"
+_PROTECTED_DIR_NAMES = frozenset({"photos", "phototakeplan", "lightphotosprt"})
+
+
+def _reject_protected_project_root(root: Path) -> None:
+    blocked = {
+        part for part in root.parts if part.casefold() in _PROTECTED_DIR_NAMES
+    }
+    if blocked:
+        names = ", ".join(sorted(blocked, key=str.casefold))
+        raise ValueError(
+            f"Project root cannot be inside {names}: {root}"
+        )
 
 
 def create_project(root: Path) -> Project:
     root = root.resolve()
+    _reject_protected_project_root(root)
     root.mkdir(parents=True, exist_ok=True)
     db_path = root / _DB_NAME
     thumbnails_dir = root / _THUMBNAILS_DIR

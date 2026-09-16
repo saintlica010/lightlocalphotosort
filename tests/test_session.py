@@ -3,7 +3,8 @@ from pathlib import Path
 from PIL import Image
 from PySide6.QtGui import QKeySequence
 
-from local_media_curator.services.project_service import create_project
+from local_media_curator.services.list_service import ListService
+from local_media_curator.services.project_service import create_project, open_project
 from local_media_curator.ui.main_window import MainWindow
 from local_media_curator.ui.media_model import MediaListModel
 
@@ -187,3 +188,46 @@ def test_add_and_remove_selection_on_virtual_list(qtbot, tmp_path: Path) -> None
     assert window.list_service.ordered_media_ids(list_id) == []
     assert window.media_grid.model.rowCount() == 0
     project.close()
+
+
+def test_add_to_list_from_all_media_uses_picker(qtbot, tmp_path: Path) -> None:
+    window, project, _source = _open_scanned_window(qtbot, tmp_path, ("A.jpg",))
+    list_id = window.list_service.create("Promotional")
+    window.refresh()
+    window.show_library_view("all")
+    window.media_grid.view.setCurrentIndex(window.media_grid.model.index(0))
+    media_id = int(window.media_grid.model.row_at(0)["id"])
+    window.list_name_picker = lambda _names: "Promotional"
+    add = next(action for action in window.actions() if action.text() == "Add to List")
+    add.trigger()
+    assert window.list_service.ordered_media_ids(list_id) == [media_id]
+    project.close()
+
+
+def test_move_selection_on_named_list_persists(qtbot, tmp_path: Path) -> None:
+    window, project, _source = _open_scanned_window(
+        qtbot, tmp_path, ("A.jpg", "B.jpg")
+    )
+    ids = {
+        window.media_grid.model.row_at(i)["file_name"]: int(
+            window.media_grid.model.row_at(i)["id"]
+        )
+        for i in range(window.media_grid.model.rowCount())
+    }
+    list_id = window.list_service.create("Promotional")
+    window.add_items_to_list(list_id, [ids["A.jpg"], ids["B.jpg"]])
+    window.show_list(list_id)
+    window.media_grid.view.setCurrentIndex(window.media_grid.model.index(0))
+    window.move_selection(1)
+    assert window.list_service.ordered_media_ids(list_id) == [
+        ids["B.jpg"],
+        ids["A.jpg"],
+    ]
+    root = project.root
+    project.close()
+    reopened = open_project(root)
+    assert ListService(reopened).ordered_media_ids(list_id) == [
+        ids["B.jpg"],
+        ids["A.jpg"],
+    ]
+    reopened.close()

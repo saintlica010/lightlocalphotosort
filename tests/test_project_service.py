@@ -31,3 +31,9 @@ def test_open_project_roundtrip(tmp_path: Path) -> None:
 def test_open_missing_project_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         open_project(tmp_path / "missing")
+
+
+def test_create_project_refuses_photos_tree(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="photos"):
+        create_project(tmp_path / "photos" / "proj")
+    assert not (tmp_path / "photos" / "proj").exists()

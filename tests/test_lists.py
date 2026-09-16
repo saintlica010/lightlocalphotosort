@@ -68,6 +68,16 @@ def _setup(tmp_path: Path, names: tuple[str, ...] = ("A.jpg",)):
     return project, ListService(project), ids, source
 
 
+def test_create_duplicate_list_name_does_not_raise(tmp_path: Path) -> None:
+    project, lists, _ids, _source = _setup(tmp_path)
+    first = lists.create("A")
+    second = lists.create("A")
+    assert first == second
+    names = [row["name"] for row in lists.all_lists()]
+    assert names == ["A"]
+    project.close()
+
+
 def test_create_rename_and_delete_list(tmp_path: Path) -> None:
     project, lists, _ids, _source = _setup(tmp_path)
     list_id = lists.create("Draft", "temporary")

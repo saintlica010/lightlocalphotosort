@@ -60,6 +60,63 @@ class _ReorderCommand(QUndoCommand):
         self._lists.restore_sort_keys(self._list_id, self._before)
 
 
+class _MoveSelectionCommand(QUndoCommand):
+    def __init__(
+        self,
+        lists: ListService,
+        list_id: int,
+        media_ids: list[int],
+        delta: int,
+    ) -> None:
+        super().__init__("Move selection")
+        self._lists = lists
+        self._list_id = list_id
+        self._media_ids = list(media_ids)
+        self._delta = delta
+        self._before = lists.items_with_sort_keys(list_id)
+        self._after: list[tuple[int, int]] | None = None
+
+    def redo(self) -> None:
+        if self._after is None:
+            self._lists.move_selection(self._list_id, self._media_ids, self._delta)
+            self._after = self._lists.items_with_sort_keys(self._list_id)
+            return
+        self._lists.restore_sort_keys(self._list_id, self._after)
+
+    def undo(self) -> None:
+        self._lists.restore_sort_keys(self._list_id, self._before)
+
+
+class _MoveToEndsCommand(QUndoCommand):
+    def __init__(
+        self,
+        lists: ListService,
+        list_id: int,
+        media_ids: list[int],
+        *,
+        end: bool,
+    ) -> None:
+        super().__init__("Move to end" if end else "Move to start")
+        self._lists = lists
+        self._list_id = list_id
+        self._media_ids = list(media_ids)
+        self._end = end
+        self._before = lists.items_with_sort_keys(list_id)
+        self._after: list[tuple[int, int]] | None = None
+
+    def redo(self) -> None:
+        if self._after is None:
+            self._lists.move_to_ends(
+                self._list_id, self._media_ids, end=self._end
+            )
+            self._after = self._lists.items_with_sort_keys(self._list_id)
+            return
+        self._lists.restore_sort_keys(self._list_id, self._after)
+
+    def undo(self) -> None:
+        self._lists.restore_sort_keys(self._list_id, self._before)
+
+
 class _AddItemsCommand(QUndoCommand):
     def __init__(
         self, lists: ListService, list_id: int, media_ids: list[int]
@@ -133,6 +190,24 @@ class CurationUndoStack:
     def reorder(self, list_id: int, media_ids_in_order: list[int]) -> None:
         self._stack.push(
             _ReorderCommand(self._lists, list_id, media_ids_in_order)
+        )
+
+    def move_selection(
+        self, list_id: int, media_ids: list[int], delta: int
+    ) -> None:
+        if not media_ids or delta == 0:
+            return
+        self._stack.push(
+            _MoveSelectionCommand(self._lists, list_id, media_ids, delta)
+        )
+
+    def move_to_ends(
+        self, list_id: int, media_ids: list[int], *, end: bool
+    ) -> None:
+        if not media_ids:
+            return
+        self._stack.push(
+            _MoveToEndsCommand(self._lists, list_id, media_ids, end=end)
         )
 
     def add_items(self, list_id: int, media_ids: list[int]) -> None:

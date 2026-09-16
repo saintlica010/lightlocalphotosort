@@ -6,11 +6,22 @@ This is **not** a general-purpose DAM. Processing stays on the machine. Source m
 
 ## Status
 
-Repository is initialized. MVP implementation has not started.
+Phase 1 MVP is usable locally: create or open a project, add a source folder, scan, maintain virtual lists, reject/restore, and undo.
 
-Planned stack: Python 3.12+, PySide6, SQLite, Pillow, PyInstaller.
+Stack: Python 3.12+, PySide6, SQLite, Pillow. PyInstaller packaging is not in this pass.
 
 See `AGENTS.md` for product rules, data-safety constraints, and the Phase 1 build order.
+
+## Usage
+
+```text
+python -m local_media_curator
+```
+
+1. **New Project** or **Open Project** — choose a folder that is not inside `photos/`, `phototakeplan/`, or `lightphotosprt/`.
+2. **Add Source Folder**, then **Scan** (F5). Source files are never moved, renamed, or rewritten.
+3. Browse All / Unassigned / Rejected, or create named virtual lists.
+4. **Add to List** (from All Media, pick a list), reject/restore, reorder a named list with `[` / `]` or Ctrl+Up/Down, and undo.
 
 ## Local reference data (not in Git)
 

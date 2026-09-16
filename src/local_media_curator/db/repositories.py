@@ -198,6 +198,12 @@ class ListRepository:
             )
         )
 
+    def get_by_name(self, name: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT id, name, description, created_at, updated_at FROM lists WHERE name = ?",
+            (name,),
+        ).fetchone()
+
     def insert(
         self,
         *,

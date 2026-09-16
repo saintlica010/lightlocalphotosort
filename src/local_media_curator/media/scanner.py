@@ -51,72 +51,83 @@ def _read_fields(path: Path, ext: str, stat_result) -> tuple[str, int | None, in
 def scan_source_folder(
     project: Project, folder: Path, *, recursive: bool = True
 ) -> ScanResult:
-    repo = MediaRepository(project.connection)
+    conn = project.connection
+    repo = MediaRepository(conn)
     result = ScanResult()
     folder_normalized = normalize_path(folder)
     existing_rows = repo.list_under_folder(folder_normalized)
     existing_by_norm = {row["normalized_path"]: row for row in existing_rows}
     seen: set[str] = set()
 
-    for path in _iter_media_files(folder, recursive):
-        try:
-            stat_result = path.stat()
-        except OSError:
-            continue
-        normalized = normalize_path(path)
-        seen.add(normalized)
-        ext = path.suffix.lower()
-        modified_at = _iso_from_mtime(stat_result.st_mtime)
-        row = existing_by_norm.get(normalized)
-
-        if row is None:
-            media_type, width, height, captured_at = _read_fields(path, ext, stat_result)
+    try:
+        for path in _iter_media_files(folder, recursive):
             try:
-                repo.insert(
-                    absolute_path=str(path.resolve()),
-                    normalized_path=normalized,
-                    media_type=media_type,
-                    file_name=path.name,
-                    extension=ext,
+                stat_result = path.stat()
+            except OSError:
+                continue
+            normalized = normalize_path(path)
+            seen.add(normalized)
+            ext = path.suffix.lower()
+            modified_at = _iso_from_mtime(stat_result.st_mtime)
+            row = existing_by_norm.get(normalized)
+
+            if row is None:
+                media_type, width, height, captured_at = _read_fields(
+                    path, ext, stat_result
+                )
+                try:
+                    repo.insert(
+                        absolute_path=str(path.resolve()),
+                        normalized_path=normalized,
+                        media_type=media_type,
+                        file_name=path.name,
+                        extension=ext,
+                        file_size=stat_result.st_size,
+                        width=width,
+                        height=height,
+                        duration_ms=None,
+                        captured_at=(
+                            captured_at if media_type == "image" else modified_at
+                        ),
+                        modified_at=modified_at,
+                        imported_at=_now_iso(),
+                    )
+                except sqlite3.IntegrityError:
+                    result.unchanged += 1
+                    continue
+                result.added += 1
+                continue
+
+            size_changed = row["file_size"] != stat_result.st_size
+            mtime_changed = row["modified_at"] != modified_at
+            if size_changed or mtime_changed:
+                media_type, width, height, captured_at = _read_fields(
+                    path, ext, stat_result
+                )
+                repo.update_file_metadata(
+                    row["id"],
                     file_size=stat_result.st_size,
                     width=width,
                     height=height,
-                    duration_ms=None,
                     captured_at=captured_at if media_type == "image" else modified_at,
                     modified_at=modified_at,
-                    imported_at=_now_iso(),
                 )
-            except sqlite3.IntegrityError:
-                result.unchanged += 1
+                result.modified += 1
                 continue
-            result.added += 1
-            continue
 
-        size_changed = row["file_size"] != stat_result.st_size
-        mtime_changed = row["modified_at"] != modified_at
-        if size_changed or mtime_changed:
-            media_type, width, height, captured_at = _read_fields(path, ext, stat_result)
-            repo.update_file_metadata(
-                row["id"],
-                file_size=stat_result.st_size,
-                width=width,
-                height=height,
-                captured_at=captured_at if media_type == "image" else modified_at,
-                modified_at=modified_at,
-            )
-            result.modified += 1
-            continue
+            if row["missing"]:
+                repo.set_missing(row["id"], False)
+            result.unchanged += 1
 
-        if row["missing"]:
-            repo.set_missing(row["id"], False)
-        result.unchanged += 1
+        for row in existing_rows:
+            if row["normalized_path"] in seen:
+                continue
+            if not row["missing"]:
+                repo.set_missing(row["id"], True)
+            result.missing += 1
 
-    for row in existing_rows:
-        if row["normalized_path"] in seen:
-            continue
-        if not row["missing"]:
-            repo.set_missing(row["id"], True)
-        result.missing += 1
-
-    project.connection.commit()
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     return result

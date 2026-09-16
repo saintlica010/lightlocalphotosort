@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import QModelIndex, Qt
@@ -13,9 +15,10 @@ from local_media_curator.services.list_service import ListService
 from local_media_curator.services.project_service import create_project, open_project
 from local_media_curator.services.rejection_service import RejectionService
 from local_media_curator.services.undo_commands import CurationUndoStack
-from local_media_curator.ui.dialogs import choose_existing_directory
+from local_media_curator.ui.dialogs import choose_existing_directory, choose_list_name
 from local_media_curator.ui.library_panel import LibraryPanel
 from local_media_curator.ui.media_grid import MediaGrid
+from local_media_curator.ui.media_model import MediaListModel
 from local_media_curator.ui.preview_panel import PreviewPanel
 
 _LIBRARY_VIEW_ROWS = {"all": 0, "unassigned": 1, "rejected": 2}
@@ -30,6 +33,7 @@ class MainWindow(QMainWindow):
         self.rejection_service: RejectionService | None = None
         self.thumbnail_service: ThumbnailService | None = None
         self.undo_stack: CurationUndoStack | None = None
+        self.list_name_picker: Callable[[list[str]], str | None] | None = None
         self._view_mode = "all"
         self._current_list_id: int | None = None
 
@@ -114,6 +118,34 @@ class MainWindow(QMainWindow):
     def add_selection_to_list(self, list_id: int) -> None:
         self.add_items_to_list(list_id, self.media_grid.selected_ids())
 
+    def move_selection(self, delta: int) -> None:
+        if (
+            self.undo_stack is None
+            or self._view_mode != "list"
+            or self._current_list_id is None
+        ):
+            return
+        media_ids = self.media_grid.selected_ids()
+        if not media_ids:
+            return
+        self.undo_stack.move_selection(self._current_list_id, media_ids, delta)
+        self.refresh()
+        self._select_media_ids(media_ids)
+
+    def move_to_ends(self, *, end: bool) -> None:
+        if (
+            self.undo_stack is None
+            or self._view_mode != "list"
+            or self._current_list_id is None
+        ):
+            return
+        media_ids = self.media_grid.selected_ids()
+        if not media_ids:
+            return
+        self.undo_stack.move_to_ends(self._current_list_id, media_ids, end=end)
+        self.refresh()
+        self._select_media_ids(media_ids)
+
     def remove_selection_from_list(self, list_id: int) -> None:
         if self.undo_stack is None:
             return
@@ -175,6 +207,25 @@ class MainWindow(QMainWindow):
         add_to_list.triggered.connect(self._on_add_to_current_list)
         remove_from_list = QAction("Remove from List", self)
         remove_from_list.triggered.connect(self._on_remove_from_current_list)
+        self.move_up_action = QAction("Move Up", self)
+        self.move_up_action.setShortcuts(
+            [QKeySequence("["), QKeySequence("Ctrl+Up")]
+        )
+        self.move_up_action.triggered.connect(lambda: self.move_selection(-1))
+        self.move_down_action = QAction("Move Down", self)
+        self.move_down_action.setShortcuts(
+            [QKeySequence("]"), QKeySequence("Ctrl+Down")]
+        )
+        self.move_down_action.triggered.connect(lambda: self.move_selection(1))
+        self.move_start_action = QAction("Move to Start", self)
+        self.move_start_action.setShortcut(QKeySequence(Qt.Key.Key_Home))
+        self.move_start_action.triggered.connect(
+            lambda: self.move_to_ends(end=False)
+        )
+        self.move_end_action = QAction("Move to End", self)
+        self.move_end_action.setShortcut(QKeySequence(Qt.Key.Key_End))
+        self.move_end_action.triggered.connect(lambda: self.move_to_ends(end=True))
+        self._set_reorder_actions_enabled(False)
 
         edit_menu = self.menuBar().addMenu("Edit")
         for action in (
@@ -184,6 +235,10 @@ class MainWindow(QMainWindow):
             restore,
             add_to_list,
             remove_from_list,
+            self.move_up_action,
+            self.move_down_action,
+            self.move_start_action,
+            self.move_end_action,
         ):
             self.addAction(action)
         edit_menu.addAction(undo)
@@ -194,6 +249,11 @@ class MainWindow(QMainWindow):
         edit_menu.addSeparator()
         edit_menu.addAction(add_to_list)
         edit_menu.addAction(remove_from_list)
+        edit_menu.addSeparator()
+        edit_menu.addAction(self.move_up_action)
+        edit_menu.addAction(self.move_down_action)
+        edit_menu.addAction(self.move_start_action)
+        edit_menu.addAction(self.move_end_action)
 
         self.media_grid.view.setContextMenuPolicy(
             Qt.ContextMenuPolicy.ActionsContextMenu
@@ -207,11 +267,40 @@ class MainWindow(QMainWindow):
         self.add_source_action.setEnabled(enabled)
         self.scan_action.setEnabled(enabled)
 
+    def _set_reorder_actions_enabled(self, enabled: bool) -> None:
+        self.move_up_action.setEnabled(enabled)
+        self.move_down_action.setEnabled(enabled)
+        self.move_start_action.setEnabled(enabled)
+        self.move_end_action.setEnabled(enabled)
+
+    def _select_media_ids(self, media_ids: list[int]) -> None:
+        selection = self.media_grid.view.selectionModel()
+        if selection is None or not media_ids:
+            return
+        wanted = set(media_ids)
+        selection.clearSelection()
+        first = None
+        for row in range(self.media_grid.model.rowCount()):
+            index = self.media_grid.model.index(row)
+            value = self.media_grid.model.data(index, MediaListModel.IdRole)
+            if value is None or int(value) not in wanted:
+                continue
+            if first is None:
+                first = index
+                selection.select(index, selection.SelectionFlag.ClearAndSelect)
+            else:
+                selection.select(index, selection.SelectionFlag.Select)
+        if first is not None:
+            self.media_grid.view.setCurrentIndex(first)
+
     def _on_new_project(self) -> None:
         path = choose_existing_directory(self, "New Project")
         if path is None:
             return
-        self.set_project(create_project(path))
+        try:
+            self.set_project(create_project(path))
+        except ValueError as exc:
+            QMessageBox.warning(self, "New Project", str(exc))
 
     def _on_open_project(self) -> None:
         path = choose_existing_directory(self, "Open Project")
@@ -285,14 +374,26 @@ class MainWindow(QMainWindow):
     def _on_create_list(self, name: str) -> None:
         if self.list_service is None:
             return
-        list_id = self.list_service.create(name)
+        try:
+            list_id = self.list_service.create(name)
+        except sqlite3.IntegrityError:
+            QMessageBox.warning(
+                self, "New list", f'A list named "{name}" already exists.'
+            )
+            return
         self._reload_lists()
         self.show_list(list_id)
 
     def _on_rename_list(self, list_id: int, name: str) -> None:
         if self.list_service is None:
             return
-        self.list_service.rename(list_id, name)
+        try:
+            self.list_service.rename(list_id, name)
+        except sqlite3.IntegrityError:
+            QMessageBox.warning(
+                self, "Rename list", f'A list named "{name}" already exists.'
+            )
+            return
         self._reload_lists()
 
     def _on_delete_list(self, list_id: int) -> None:
@@ -309,8 +410,26 @@ class MainWindow(QMainWindow):
             return self._current_list_id
         return self.library_panel.list_panel.selected_list_id()
 
+    def _choose_list_id(self) -> int | None:
+        if self.list_service is None:
+            return None
+        rows = self.list_service.all_lists()
+        if not rows:
+            return None
+        names = [str(row["name"]) for row in rows]
+        picker = self.list_name_picker
+        chosen = picker(names) if picker is not None else choose_list_name(self, names)
+        if not chosen:
+            return None
+        for row in rows:
+            if str(row["name"]) == chosen:
+                return int(row["id"])
+        return None
+
     def _on_add_to_current_list(self) -> None:
         list_id = self._target_list_id()
+        if list_id is None:
+            list_id = self._choose_list_id()
         if list_id is None:
             return
         self.add_selection_to_list(list_id)
@@ -335,6 +454,7 @@ class MainWindow(QMainWindow):
             self.media_grid.model.set_rows([])
             self.preview_panel.set_media(None)
             self.media_grid.set_manual_order_enabled(False)
+            self._set_reorder_actions_enabled(False)
             return
         items = self._media_for_current_view()
         rows = [
@@ -342,7 +462,9 @@ class MainWindow(QMainWindow):
             for ordinal, item in enumerate(items, start=1)
         ]
         self.media_grid.model.set_rows(rows)
-        self.media_grid.set_manual_order_enabled(self._view_mode == "list")
+        list_mode = self._view_mode == "list"
+        self.media_grid.set_manual_order_enabled(list_mode)
+        self._set_reorder_actions_enabled(list_mode)
         current = self.media_grid.view.currentIndex()
         if current.isValid():
             self.preview_panel.set_media(self.media_grid.model.row_at(current.row()))
