@@ -9,6 +9,13 @@ Governing spec: `AGENTS.md` (read it first — it is the authority)
 Source review: `docs/PHASE1_1_REVIEW_FIXES.md`
 Implementation plan: `docs/superpowers/plans/2026-09-16-phase1-1-review-fixes.md`
 
+**Whole-branch review verdict on pushing this branch: Yes.** No safety rule is violated — source media is provably untouched, project state is project-local, lists use a relationship entity with independent sparse `sort_key`, rejection is logical, and there is no protected or binary data anywhere in the 68-file diff. The two measured responsiveness defects (C1, I1) are documented below with reproductions and ordered for the next agent. This is a feature branch, not a merge to `main`.
+
+Two limits on the evidence below, stated by the reviewer so they are not over-read:
+
+- This machine's `os.stat` is unusually slow (~135 µs warm vs 5–15 µs typical), so C1's absolute numbers will be smaller elsewhere. The O(N) shape and the GUI-thread violation hold regardless — which is why C1 should be verified by call count, not by timing.
+- PySide6 6.11 does not abort on unhandled exceptions in slots or `QRunnable.run()`; it prints and continues. That is why two candidate crash findings are Minor rather than Critical — and it is also why I1's dropped user action is silent.
+
 ---
 
 ## 0. Read this before running anything
@@ -125,14 +132,33 @@ Tasks 6, 7, 8 and 9 in the plan are written in full, with tests, and can be exec
 
 ---
 
-## 5. Suggested order for tomorrow
+## 5. The queue, in order
 
-1. **C1** — it is the difference between "usable at 10k" and "19 s freeze per action", and it is what review item #3 was actually about.
-2. **I3 / plan Task 7** — an open safety gap; small, and its tests are already written.
-3. **I1** — silent data-loss-shaped behaviour during scans.
-4. **Plan Tasks 6, 8** (items #9, #8) — finish the phase properly.
-5. **I2, I4, M1–M10.**
-6. **Plan Tasks 9, 10** (items #12, #11) — the perf and Windows smoke evidence, and the §15 gate.
+This ordering comes from the final whole-branch review's triage, not from the author of this document. Nothing on the deferred list blocks the push that already happened; this is the next agent's work queue.
+
+1. **C1.** It is what review item #3 was actually about, and it is the difference between "usable at 10k" and "19 s freeze per action".
+   - **Verify it with a filesystem-call-count assertion, not a timing test.** A timing assertion will flake across machines; a call-count assertion is exactly the guard whose absence let C1 through. Copy the pattern already in `tests/test_library_query.py::test_grid_reload_does_not_issue_per_item_list_name_queries`.
+   - **Arm the delegate test (M10) first.** The delegate is load-bearing for C1's fix, so its "no source decode in `paint()`" invariant must be armed before that refactor touches the code path.
+2. **I1** — batch-commit the scan. This also closes two deferred items as side effects: the orphan-QThread-on-30 s-stall risk, and the missing cancel check in the missing-marking pass (both become near-impossible once cancel latency is bounded).
+3. **I2** — re-select after reload, so undo of a reject keeps the photo selected and previewed.
+4. **I3 / plan Task 7** — the overlap guard. This is the one remaining `AGENTS.md` gap; its tests are already written in the plan.
+5. **Plan Tasks 6 and 8** (items #9, #8) — scan progress and the filter UI, to finish the phase properly.
+6. **I4 and the `docs/codebase/` refresh together** — so the docs match what C1's fix changes, rather than being refreshed twice.
+7. **Plan Tasks 9 and 10** (items #12, #11) — the 1k/10k perf evidence and the Windows smoke, and the §15 gate.
+8. M2, M3, M4, M5, M6, M7, M8, M9, M1/M12 (fold these two together — the `thumbnail_pool` emit hardening) — opportunistic, while already in those files.
+
+**Dropped — do not spend time on these.** The triage explicitly closes them:
+
+- **M9 (`keys()` has no test and no caller)** — delete the method rather than testing dead code. That also removes the undocumented-ordering question entirely.
+- **M5's chunking concern** — SQLite 3.49.1 allows 32,766 variables, so ≤10k items are safe; a comment, not a change.
+- **The `.pytest_cache` warning** — environment artifact, no code implication.
+- **Report line counts off by one** — immaterial.
+- **`_current_token()` unlocked read** — worst case one wasted decode; it is the only cross-thread read.
+- **The scan test passing against a no-op cancel** — already resolved at HEAD; the amended `COUNT(*) == 0` assertion genuinely distinguishes cancellation from waiting the scan out.
+- **Mixed `Co-Authored-By` trailers** — expected under current session guidance, not a defect.
+- **`b41099d`'s inaccurate message** — state it in the PR body; do not rewrite pushed history.
+- **The scan test proving mechanism rather than responsiveness** — a prior reviewer judged the deterministic trade correct and asked that it not be re-litigated. Cover the consequence with a filesystem-call-count test instead.
+- **`docs/codebase/`** — refresh or delete it; do not try to "fix" it in place. Note it is stale in three of its five listed risks and is wrong about `MainWindow`'s size.
 
 Process note: Tasks 3–5 were done under subagent-driven development — one implementer per task, an independent reviewer after each with separate spec and quality verdicts, a bounded fix loop, and a final whole-branch review. The record of that (rulings, deferred minors, review packages) lives in `.superpowers/sdd/2026-09-16-phase1-1-review-fixes/`, which is **git-ignored scratch** and not on the remote. Everything that matters from it is reproduced in this document.
 
