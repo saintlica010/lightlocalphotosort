@@ -5,6 +5,7 @@ from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 from local_media_curator.ui.media_model import MediaListModel
+from local_media_curator.ui.pixmap_cache import BoundedPixmapCache
 
 THUMB_SIZE = 160
 
@@ -22,7 +23,7 @@ def ordinal_label(value: object) -> str | None:
 class ThumbnailDelegate(QStyledItemDelegate):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self._pixmaps: dict[str, QPixmap] = {}
+        self._pixmaps = BoundedPixmapCache()
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
         painter.save()
@@ -94,5 +95,5 @@ class ThumbnailDelegate(QStyledItemDelegate):
         pix = QPixmap(key)
         if pix.isNull():
             return None
-        self._pixmaps[key] = pix
+        self._pixmaps.put(key, pix)
         return pix
