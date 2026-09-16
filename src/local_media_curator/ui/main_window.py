@@ -170,7 +170,9 @@ class MainWindow(QMainWindow):
         self.refresh()
         self._select_media_ids(media_ids)
 
-    def apply_grid_order(self, ids: list[int]) -> None:
+    def apply_grid_order(
+        self, ids: list[int], moved_ids: list[int] | None = None
+    ) -> None:
         if (
             self.undo_stack is None
             or self._view_mode != "list"
@@ -186,8 +188,18 @@ class MainWindow(QMainWindow):
         ordered = [int(media_id) for media_id in ids]
         if ordered == current:
             return
+        source_ids = (
+            moved_ids
+            if moved_ids is not None
+            else self.media_grid.selected_ids()
+        )
+        previously_selected = {int(media_id) for media_id in source_ids}
+        to_select = [
+            media_id for media_id in ordered if media_id in previously_selected
+        ]
         self.undo_stack.reorder(self._current_list_id, ordered)
         self.refresh()
+        self._select_media_ids(to_select)
 
     def move_to_ends(self, *, end: bool) -> None:
         if (

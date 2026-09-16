@@ -25,6 +25,7 @@ def test_drop_reorders_ids_and_emits(qtbot) -> None:
         mime = model.mimeData([model.index(0, 0)])
         assert model.dropMimeData(mime, Qt.DropAction.MoveAction, 3, 0, parent)
     assert blocker.args[0] == [2, 3, 1]
+    assert blocker.args[1] == [1]
     assert [model.data(model.index(i), MediaListModel.IdRole) for i in range(3)] == [
         2,
         3,
@@ -128,6 +129,26 @@ def test_apply_grid_order_persists_named_list(qtbot, tmp_path: Path) -> None:
     project.close()
 
 
+def test_apply_grid_order_keeps_selection_on_moved_item(qtbot, tmp_path: Path) -> None:
+    window, project = _open_scanned_window(qtbot, tmp_path, ("A.jpg", "B.jpg"))
+    ids = {
+        window.media_grid.model.row_at(i)["file_name"]: int(
+            window.media_grid.model.row_at(i)["id"]
+        )
+        for i in range(window.media_grid.model.rowCount())
+    }
+    list_id = window.list_service.create("Promotional")
+    window.add_items_to_list(list_id, [ids["A.jpg"], ids["B.jpg"]])
+    window.show_list(list_id)
+    window.media_grid.view.setCurrentIndex(window.media_grid.model.index(0))
+    assert window.media_grid.selected_ids() == [ids["A.jpg"]]
+    window.apply_grid_order([ids["B.jpg"], ids["A.jpg"]])
+    assert window.media_grid.selected_ids() == [ids["A.jpg"]]
+    window.media_grid.model.orderChanged.emit([ids["A.jpg"], ids["B.jpg"]], [ids["A.jpg"]])
+    assert window.media_grid.selected_ids() == [ids["A.jpg"]]
+    project.close()
+
+
 def test_order_changed_signal_persists_named_list(qtbot, tmp_path: Path) -> None:
     window, project = _open_scanned_window(qtbot, tmp_path, ("A.jpg", "B.jpg"))
     ids = {
@@ -139,7 +160,9 @@ def test_order_changed_signal_persists_named_list(qtbot, tmp_path: Path) -> None
     list_id = window.list_service.create("Promotional")
     window.add_items_to_list(list_id, [ids["A.jpg"], ids["B.jpg"]])
     window.show_list(list_id)
-    window.media_grid.model.orderChanged.emit([ids["B.jpg"], ids["A.jpg"]])
+    window.media_grid.model.orderChanged.emit(
+        [ids["B.jpg"], ids["A.jpg"]], [ids["B.jpg"]]
+    )
     assert window.list_service.ordered_media_ids(list_id) == [
         ids["B.jpg"],
         ids["A.jpg"],

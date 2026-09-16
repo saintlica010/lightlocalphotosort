@@ -20,7 +20,7 @@ class MediaListModel(QAbstractListModel):
     OrdinalRole = Qt.ItemDataRole.UserRole + 3
     RejectedRole = Qt.ItemDataRole.UserRole + 4
     ThumbnailPathRole = Qt.ItemDataRole.UserRole + 5
-    orderChanged = Signal(list)
+    orderChanged = Signal(list, list)
 
     def __init__(
         self,
@@ -171,5 +171,5 @@ class MediaListModel(QAbstractListModel):
             item["ordinal"] = ordinal
         self._rows = new_rows
         self.endResetModel()
-        self.orderChanged.emit(new_ids)
+        self.orderChanged.emit(new_ids, list(moved_ids))
         return True
