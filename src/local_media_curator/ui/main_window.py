@@ -62,6 +62,7 @@ class MainWindow(QMainWindow):
         self.library_panel.list_panel.create_requested.connect(self._on_create_list)
         self.library_panel.list_panel.rename_requested.connect(self._on_rename_list)
         self.library_panel.list_panel.delete_requested.connect(self._on_delete_list)
+        self.media_grid.model.orderChanged.connect(self.apply_grid_order)
         self._set_project_actions_enabled(False)
 
     def set_undo_stack(self, stack: CurationUndoStack | None) -> None:
@@ -168,6 +169,25 @@ class MainWindow(QMainWindow):
         self.undo_stack.move_selection(self._current_list_id, media_ids, delta)
         self.refresh()
         self._select_media_ids(media_ids)
+
+    def apply_grid_order(self, ids: list[int]) -> None:
+        if (
+            self.undo_stack is None
+            or self._view_mode != "list"
+            or self._current_list_id is None
+            or not ids
+        ):
+            return
+        current = (
+            self.list_service.ordered_media_ids(self._current_list_id)
+            if self.list_service is not None
+            else []
+        )
+        ordered = [int(media_id) for media_id in ids]
+        if ordered == current:
+            return
+        self.undo_stack.reorder(self._current_list_id, ordered)
+        self.refresh()
 
     def move_to_ends(self, *, end: bool) -> None:
         if (
@@ -500,13 +520,13 @@ class MainWindow(QMainWindow):
             self._set_reorder_actions_enabled(False)
             return
         items = self._media_for_current_view()
+        list_mode = self._view_mode == "list"
         rows = [
-            self._row_from_media(item, ordinal)
+            self._row_from_media(item, ordinal if list_mode else None)
             for ordinal, item in enumerate(items, start=1)
         ]
         jobs = self._thumbnail_jobs(items, rows)
         self.media_grid.model.set_rows(rows)
-        list_mode = self._view_mode == "list"
         self.media_grid.set_manual_order_enabled(list_mode)
         self._set_reorder_actions_enabled(list_mode)
         current = self.media_grid.view.currentIndex()
@@ -534,7 +554,7 @@ class MainWindow(QMainWindow):
             return self.library_service.list_media_by_ids(media_ids)
         return self.library_service.list_media(include_rejected=False)
 
-    def _row_from_media(self, media: Media, ordinal: int) -> dict[str, object]:
+    def _row_from_media(self, media: Media, ordinal: int | None) -> dict[str, object]:
         lists = (
             self.list_service.list_names_for_media(media.id)
             if self.list_service is not None

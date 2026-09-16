@@ -9,6 +9,16 @@ from local_media_curator.ui.media_model import MediaListModel
 THUMB_SIZE = 160
 
 
+def ordinal_label(value: object) -> str | None:
+    if value is None:
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return f"{number:02d}"
+
+
 class ThumbnailDelegate(QStyledItemDelegate):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -37,6 +47,19 @@ class ThumbnailDelegate(QStyledItemDelegate):
             x = thumb_rect.x() + (thumb_rect.width() - scaled.width()) // 2
             y = thumb_rect.y() + (thumb_rect.height() - scaled.height()) // 2
             painter.drawPixmap(x, y, scaled)
+
+        label = ordinal_label(index.data(MediaListModel.OrdinalRole))
+        if label:
+            text_width = painter.fontMetrics().horizontalAdvance(label)
+            badge = QRect(
+                thumb_rect.left() + 4,
+                thumb_rect.top() + 4,
+                max(24, text_width + 8),
+                18,
+            )
+            painter.fillRect(badge, QColor(0, 0, 0, 160))
+            painter.setPen(QColor("#ffffff"))
+            painter.drawText(badge, int(Qt.AlignmentFlag.AlignCenter), label)
 
         name = index.data(MediaListModel.FileNameRole)
         if name:

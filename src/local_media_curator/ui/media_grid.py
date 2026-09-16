@@ -27,6 +27,7 @@ class MediaGrid(QWidget):
         layout.addWidget(self._view)
 
     def set_manual_order_enabled(self, enabled: bool) -> None:
+        self._model.set_manual_order_enabled(enabled)
         if enabled:
             self._view.setMovement(QListView.Movement.Snap)
             self._view.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
