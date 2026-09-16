@@ -126,6 +126,29 @@ class MediaRepository:
             (int(missing), media_id),
         )
 
+    def set_rejected(self, media_ids: list[int], rejected: bool) -> None:
+        if not media_ids:
+            return
+        placeholders = ",".join("?" * len(media_ids))
+        self._conn.execute(
+            f"UPDATE media SET rejected = ? WHERE id IN ({placeholders})",
+            (int(rejected), *media_ids),
+        )
+
+    def list_media(
+        self,
+        *,
+        include_rejected: bool = False,
+        rejected_only: bool = False,
+    ) -> list[sqlite3.Row]:
+        if rejected_only:
+            sql = "SELECT * FROM media WHERE rejected = 1 ORDER BY id"
+        elif include_rejected:
+            sql = "SELECT * FROM media ORDER BY id"
+        else:
+            sql = "SELECT * FROM media WHERE rejected = 0 ORDER BY id"
+        return list(self._conn.execute(sql))
+
 
 class ListRepository:
     def __init__(self, connection: sqlite3.Connection) -> None:

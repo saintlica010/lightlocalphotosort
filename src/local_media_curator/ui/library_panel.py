@@ -10,6 +10,8 @@ class LibraryPanel(QWidget):
         super().__init__(parent)
         self.views = QListWidget(self)
         self.views.addItem("All")
+        self.views.addItem("Unassigned")
+        self.views.addItem("Rejected")
         self.list_panel = ListPanel(self)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Library"))
