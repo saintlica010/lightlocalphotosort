@@ -39,6 +39,7 @@ class MainWindow(QMainWindow):
         self.list_name_picker: Callable[[list[str]], str | None] | None = None
         self._view_mode = "all"
         self._current_list_id: int | None = None
+        self._sort_by = "file_name"
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
 
@@ -56,6 +57,7 @@ class MainWindow(QMainWindow):
             self._on_media_current_changed
         )
         self.library_panel.view_changed.connect(self._on_library_view_changed)
+        self.library_panel.sort_changed.connect(self._on_library_sort_changed)
         self.library_panel.list_panel.current_list_changed.connect(
             self._on_named_list_changed
         )
@@ -79,6 +81,7 @@ class MainWindow(QMainWindow):
         self.set_undo_stack(CurationUndoStack(project))
         self._view_mode = "all"
         self._current_list_id = None
+        self._sort_by = self.library_panel.current_sort()
         if previous is not None and previous is not project:
             previous.close()
         self._set_project_actions_enabled(True)
@@ -92,6 +95,11 @@ class MainWindow(QMainWindow):
         if self.library_service is None:
             return
         self.library_service.add_source_folder(path)
+
+    def remove_source_folder(self, path: Path) -> None:
+        if self.library_service is None:
+            return
+        self.library_service.remove_source_folder(path)
 
     def scan(self) -> None:
         if self.project is None:
@@ -252,6 +260,8 @@ class MainWindow(QMainWindow):
         open_project_action.triggered.connect(self._on_open_project)
         self.add_source_action = QAction("Add Source Folder", self)
         self.add_source_action.triggered.connect(self._on_add_source_folder)
+        self.remove_source_action = QAction("Remove Source Folder", self)
+        self.remove_source_action.triggered.connect(self._on_remove_source_folder)
         self.scan_action = QAction("Scan", self)
         self.scan_action.setShortcut(QKeySequence(Qt.Key.Key_F5))
         self.scan_action.triggered.connect(self._on_scan)
@@ -261,6 +271,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(open_project_action)
         file_menu.addSeparator()
         file_menu.addAction(self.add_source_action)
+        file_menu.addAction(self.remove_source_action)
         file_menu.addAction(self.scan_action)
         file_menu.addAction(self.open_original_action)
 
@@ -337,6 +348,7 @@ class MainWindow(QMainWindow):
 
     def _set_project_actions_enabled(self, enabled: bool) -> None:
         self.add_source_action.setEnabled(enabled)
+        self.remove_source_action.setEnabled(enabled)
         self.scan_action.setEnabled(enabled)
 
     def _set_reorder_actions_enabled(self, enabled: bool) -> None:
@@ -392,6 +404,18 @@ class MainWindow(QMainWindow):
         if path is None:
             return
         self.add_source_folder(path)
+
+    def _on_remove_source_folder(self) -> None:
+        if self.library_service is None:
+            return
+        path = choose_existing_directory(self, "Remove Source Folder")
+        if path is None:
+            return
+        self.remove_source_folder(path)
+
+    def _on_library_sort_changed(self, sort_by: str) -> None:
+        self._sort_by = sort_by
+        self._reload_grid()
 
     def _on_scan(self) -> None:
         self.scan()
@@ -530,6 +554,7 @@ class MainWindow(QMainWindow):
             self.preview_panel.set_media(None)
             self.media_grid.set_manual_order_enabled(False)
             self._set_reorder_actions_enabled(False)
+            self.statusBar().clearMessage()
             return
         items = self._media_for_current_view()
         list_mode = self._view_mode == "list"
@@ -541,6 +566,7 @@ class MainWindow(QMainWindow):
         self.media_grid.model.set_rows(rows)
         self.media_grid.set_manual_order_enabled(list_mode)
         self._set_reorder_actions_enabled(list_mode)
+        self._set_order_status(list_mode)
         current = self.media_grid.view.currentIndex()
         if current.isValid():
             self.preview_panel.set_media(self.media_grid.model.row_at(current.row()))
@@ -549,14 +575,22 @@ class MainWindow(QMainWindow):
         if self.thumbnail_pool is not None and jobs:
             self.thumbnail_pool.request(jobs)
 
+    def _set_order_status(self, list_mode: bool) -> None:
+        if list_mode:
+            self.statusBar().showMessage("List (manual order)")
+        else:
+            self.statusBar().showMessage("Library (sorted)")
+
     def _media_for_current_view(self) -> list[Media]:
         assert self.library_service is not None
         if self._view_mode == "rejected":
             return self.library_service.list_media(
-                include_rejected=True, rejected_only=True
+                include_rejected=True,
+                rejected_only=True,
+                sort_by=self._sort_by,
             )
         if self._view_mode == "unassigned":
-            return self.library_service.list_unassigned()
+            return self.library_service.list_unassigned(sort_by=self._sort_by)
         if (
             self._view_mode == "list"
             and self._current_list_id is not None
@@ -564,7 +598,10 @@ class MainWindow(QMainWindow):
         ):
             media_ids = self.list_service.ordered_media_ids(self._current_list_id)
             return self.library_service.list_media_by_ids(media_ids)
-        return self.library_service.list_media(include_rejected=False)
+        return self.library_service.list_media(
+            include_rejected=False,
+            sort_by=self._sort_by,
+        )
 
     def _row_from_media(self, media: Media, ordinal: int | None) -> dict[str, object]:
         lists = (

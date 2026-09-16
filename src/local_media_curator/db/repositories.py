@@ -7,6 +7,23 @@ from pathlib import Path
 from local_media_curator.domain.ordering import next_sort_key
 from local_media_curator.domain.paths import normalize_path
 
+_SORT_EXPRESSIONS = {
+    "file_name": "file_name COLLATE NOCASE",
+    "captured_at": "captured_at",
+    "modified_at": "modified_at",
+    "file_size": "file_size",
+    "imported_at": "imported_at",
+}
+
+
+def _order_clause(sort_by: str) -> str:
+    return _SORT_EXPRESSIONS.get(sort_by, _SORT_EXPRESSIONS["file_name"])
+
+
+def _normalize_extension(extension: str) -> str:
+    ext = extension.lower()
+    return ext if ext.startswith(".") else f".{ext}"
+
 
 class SourceFolderRepository:
     def __init__(self, connection: sqlite3.Connection) -> None:
@@ -24,6 +41,11 @@ class SourceFolderRepository:
             """,
             (stored, int(recursive)),
         )
+        self._conn.commit()
+
+    def remove(self, path: Path) -> None:
+        stored = normalize_path(path)
+        self._conn.execute("DELETE FROM source_folders WHERE path = ?", (stored,))
         self._conn.commit()
 
     def list_enabled(self) -> list[sqlite3.Row]:
@@ -150,26 +172,57 @@ class MediaRepository:
         *,
         include_rejected: bool = False,
         rejected_only: bool = False,
+        sort_by: str = "file_name",
+        media_type: str | None = None,
+        extension: str | None = None,
     ) -> list[sqlite3.Row]:
+        clauses: list[str] = []
+        params: list[object] = []
         if rejected_only:
-            sql = "SELECT * FROM media WHERE rejected = 1 ORDER BY id"
-        elif include_rejected:
-            sql = "SELECT * FROM media ORDER BY id"
-        else:
-            sql = "SELECT * FROM media WHERE rejected = 0 ORDER BY id"
-        return list(self._conn.execute(sql))
+            clauses.append("rejected = 1")
+        elif not include_rejected:
+            clauses.append("rejected = 0")
+        self._append_type_filters(clauses, params, media_type, extension)
+        return self._select_media(clauses, params, sort_by)
 
-    def list_unassigned(self) -> list[sqlite3.Row]:
-        return list(
-            self._conn.execute(
-                """
-                SELECT * FROM media
-                WHERE rejected = 0
-                  AND id NOT IN (SELECT media_id FROM list_items)
-                ORDER BY id
-                """
-            )
-        )
+    def list_unassigned(
+        self,
+        *,
+        sort_by: str = "file_name",
+        media_type: str | None = None,
+        extension: str | None = None,
+    ) -> list[sqlite3.Row]:
+        clauses = [
+            "rejected = 0",
+            "id NOT IN (SELECT media_id FROM list_items)",
+        ]
+        params: list[object] = []
+        self._append_type_filters(clauses, params, media_type, extension)
+        return self._select_media(clauses, params, sort_by)
+
+    def _append_type_filters(
+        self,
+        clauses: list[str],
+        params: list[object],
+        media_type: str | None,
+        extension: str | None,
+    ) -> None:
+        if media_type:
+            clauses.append("media_type = ?")
+            params.append(media_type)
+        if extension:
+            clauses.append("extension = ?")
+            params.append(_normalize_extension(extension))
+
+    def _select_media(
+        self,
+        clauses: list[str],
+        params: list[object],
+        sort_by: str,
+    ) -> list[sqlite3.Row]:
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        sql = f"SELECT * FROM media {where} ORDER BY {_order_clause(sort_by)}, id"
+        return list(self._conn.execute(sql, params))
 
     def get_by_ids(self, media_ids: list[int]) -> list[sqlite3.Row]:
         if not media_ids:

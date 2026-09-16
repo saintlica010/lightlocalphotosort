@@ -16,6 +16,9 @@ class LibraryService:
     def add_source_folder(self, path: Path, *, recursive: bool = True) -> None:
         self._source_folders.add(path, recursive=recursive)
 
+    def remove_source_folder(self, path: Path) -> None:
+        self._source_folders.remove(path)
+
     def scan(self) -> ScanResult:
         total = ScanResult()
         for row in self._source_folders.list_enabled():
@@ -35,15 +38,32 @@ class LibraryService:
         *,
         include_rejected: bool = False,
         rejected_only: bool = False,
+        sort_by: str = "file_name",
+        media_type: str | None = None,
+        extension: str | None = None,
     ) -> list[Media]:
         rows = self._media.list_media(
             include_rejected=include_rejected,
             rejected_only=rejected_only,
+            sort_by=sort_by,
+            media_type=media_type,
+            extension=extension,
         )
         return [Media.from_row(row) for row in rows]
 
-    def list_unassigned(self) -> list[Media]:
-        return [Media.from_row(row) for row in self._media.list_unassigned()]
+    def list_unassigned(
+        self,
+        *,
+        sort_by: str = "file_name",
+        media_type: str | None = None,
+        extension: str | None = None,
+    ) -> list[Media]:
+        rows = self._media.list_unassigned(
+            sort_by=sort_by,
+            media_type=media_type,
+            extension=extension,
+        )
+        return [Media.from_row(row) for row in rows]
 
     def list_media_by_ids(self, media_ids: list[int]) -> list[Media]:
         return [Media.from_row(row) for row in self._media.get_by_ids(media_ids)]

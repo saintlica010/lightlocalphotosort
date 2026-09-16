@@ -1,4 +1,6 @@
 import hashlib
+import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -56,3 +58,24 @@ def test_scan_rolls_back_on_write_failure(tmp_path: Path, monkeypatch) -> None:
     count = project.connection.execute("SELECT COUNT(*) FROM media").fetchone()[0]
     assert count == 0
     project.close()
+
+
+def test_scan_read_only_source_directory(tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "src"
+    source.mkdir()
+    photo = source / "A.jpg"
+    Image.new("RGB", (10, 10)).save(photo, "JPEG")
+    before = photo.read_bytes()
+    # Directory chmod is unreliable on Windows; lock the file instead.
+    os.chmod(photo, stat.S_IREAD)
+    try:
+        lib = LibraryService(project)
+        lib.add_source_folder(source)
+        lib.scan()
+        assert project.connection.execute("SELECT COUNT(*) FROM media").fetchone()[0] == 1
+        assert photo.is_file()
+        assert photo.read_bytes() == before
+    finally:
+        os.chmod(photo, stat.S_IREAD | stat.S_IWRITE)
+        project.close()
