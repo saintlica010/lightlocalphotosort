@@ -31,6 +31,7 @@ class ListPanel(QWidget):
         self.rename_button.clicked.connect(self._on_rename)
         self.delete_button.clicked.connect(self._on_delete)
         self.lists_widget.currentItemChanged.connect(self._on_current_changed)
+        self.lists_widget.itemClicked.connect(self._on_item_clicked)
 
         buttons = QHBoxLayout()
         buttons.addWidget(self.new_button)
@@ -82,6 +83,9 @@ class ListPanel(QWidget):
         if list_id is None:
             return
         self.delete_requested.emit(list_id)
+
+    def _on_item_clicked(self, item: QListWidgetItem) -> None:
+        self._on_current_changed(item, None)
 
     def _on_current_changed(
         self, current: QListWidgetItem | None, _previous: QListWidgetItem | None

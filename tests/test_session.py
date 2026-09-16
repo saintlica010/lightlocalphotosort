@@ -128,6 +128,49 @@ def test_delete_rejects_selection_via_undo_stack(qtbot, tmp_path: Path) -> None:
     project.close()
 
 
+def test_reselecting_all_media_after_named_list_restores_library(
+    qtbot, tmp_path: Path
+) -> None:
+    window, project, _source = _open_scanned_window(qtbot, tmp_path)
+    list_id = window.list_service.create("Promotional")
+    window.refresh()
+    a_id = next(
+        int(window.media_grid.model.row_at(i)["id"])
+        for i in range(window.media_grid.model.rowCount())
+        if window.media_grid.model.row_at(i)["file_name"] == "A.jpg"
+    )
+    window.add_items_to_list(list_id, [a_id])
+
+    window._on_named_list_changed(list_id)
+    assert window.media_grid.model.rowCount() == 1
+    assert window.media_grid.model.row_at(0)["file_name"] == "A.jpg"
+
+    views = window.library_panel.views
+    views.setCurrentRow(0)
+    all_item = views.item(0)
+    assert all_item is not None
+    views.itemClicked.emit(all_item)
+
+    names = {
+        window.media_grid.model.row_at(i)["file_name"]
+        for i in range(window.media_grid.model.rowCount())
+    }
+    assert names == {"A.jpg", "B.jpg"}
+    project.close()
+
+
+def test_reject_clears_preview_when_grid_empty(qtbot, tmp_path: Path) -> None:
+    window, project, _source = _open_scanned_window(qtbot, tmp_path, ("A.jpg",))
+    window.media_grid.view.setCurrentIndex(window.media_grid.model.index(0))
+    assert window.preview_panel.file_name_label.text() == "A.jpg"
+
+    window.reject_selection()
+
+    assert window.media_grid.model.rowCount() == 0
+    assert window.preview_panel.file_name_label.text() == ""
+    project.close()
+
+
 def test_add_and_remove_selection_on_virtual_list(qtbot, tmp_path: Path) -> None:
     window, project, _source = _open_scanned_window(qtbot, tmp_path, ("A.jpg",))
     list_id = window.list_service.create("Promotional")

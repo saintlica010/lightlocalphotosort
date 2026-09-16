@@ -96,23 +96,13 @@ class MainWindow(QMainWindow):
     def show_library_view(self, name: str) -> None:
         self._view_mode = name
         self._current_list_id = None
-        views = self.library_panel.views
-        views.blockSignals(True)
-        views.setCurrentRow(_LIBRARY_VIEW_ROWS[name])
-        views.blockSignals(False)
+        self._sync_library_selection(name)
         self._reload_grid()
 
     def show_list(self, list_id: int) -> None:
         self._view_mode = "list"
         self._current_list_id = list_id
-        lists_widget = self.library_panel.list_panel.lists_widget
-        lists_widget.blockSignals(True)
-        for row in range(lists_widget.count()):
-            item = lists_widget.item(row)
-            if item is not None and int(item.data(Qt.ItemDataRole.UserRole)) == list_id:
-                lists_widget.setCurrentItem(item)
-                break
-        lists_widget.blockSignals(False)
+        self._sync_named_list_selection(list_id)
         self._reload_grid()
 
     def add_items_to_list(self, list_id: int, media_ids: list[int]) -> None:
@@ -256,16 +246,41 @@ class MainWindow(QMainWindow):
             self.refresh()
 
     def _on_library_view_changed(self, name: str) -> None:
-        self._view_mode = name
-        self._current_list_id = None
-        self._reload_grid()
+        self.show_library_view(name)
 
     def _on_named_list_changed(self, list_id: object) -> None:
         if list_id is None:
             return
-        self._view_mode = "list"
-        self._current_list_id = int(list_id)
-        self._reload_grid()
+        self.show_list(int(list_id))
+
+    def _sync_library_selection(self, name: str) -> None:
+        views = self.library_panel.views
+        views.blockSignals(True)
+        views.setCurrentRow(_LIBRARY_VIEW_ROWS[name])
+        views.blockSignals(False)
+        self._clear_named_list_selection()
+
+    def _sync_named_list_selection(self, list_id: int) -> None:
+        views = self.library_panel.views
+        views.blockSignals(True)
+        views.setCurrentRow(-1)
+        views.clearSelection()
+        views.blockSignals(False)
+        lists_widget = self.library_panel.list_panel.lists_widget
+        lists_widget.blockSignals(True)
+        for row in range(lists_widget.count()):
+            item = lists_widget.item(row)
+            if item is not None and int(item.data(Qt.ItemDataRole.UserRole)) == list_id:
+                lists_widget.setCurrentItem(item)
+                break
+        lists_widget.blockSignals(False)
+
+    def _clear_named_list_selection(self) -> None:
+        lists_widget = self.library_panel.list_panel.lists_widget
+        lists_widget.blockSignals(True)
+        lists_widget.setCurrentItem(None)
+        lists_widget.clearSelection()
+        lists_widget.blockSignals(False)
 
     def _on_create_list(self, name: str) -> None:
         if self.list_service is None:
@@ -328,6 +343,11 @@ class MainWindow(QMainWindow):
         ]
         self.media_grid.model.set_rows(rows)
         self.media_grid.set_manual_order_enabled(self._view_mode == "list")
+        current = self.media_grid.view.currentIndex()
+        if current.isValid():
+            self.preview_panel.set_media(self.media_grid.model.row_at(current.row()))
+        else:
+            self.preview_panel.set_media(None)
 
     def _media_for_current_view(self) -> list[Media]:
         assert self.library_service is not None
