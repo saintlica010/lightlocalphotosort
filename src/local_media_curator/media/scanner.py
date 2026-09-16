@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import datetime
 from pathlib import Path
 
@@ -16,6 +16,10 @@ from local_media_curator.media.metadata import extract_image_metadata
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}
 VIDEO_EXTENSIONS = {".mp4", ".mov"}
 SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
+
+
+class ScanCancelled(Exception):
+    pass
 
 
 def _iso_from_mtime(mtime: float) -> str:
@@ -65,7 +69,11 @@ def _read_fields(path: Path, ext: str, stat_result) -> tuple[str, int | None, in
 
 
 def scan_source_folder(
-    project: Project, folder: Path, *, recursive: bool = True
+    project: Project,
+    folder: Path,
+    *,
+    recursive: bool = True,
+    cancel_check: Callable[[], bool] | None = None,
 ) -> ScanResult:
     conn = project.connection
     repo = MediaRepository(conn)
@@ -79,6 +87,9 @@ def scan_source_folder(
         for path in _iter_media_files(
             folder, recursive, skip_dirs=(project.thumbnails_dir,)
         ):
+            if cancel_check is not None and cancel_check():
+                conn.rollback()
+                raise ScanCancelled()
             try:
                 stat_result = path.stat()
             except OSError:

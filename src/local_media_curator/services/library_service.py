@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from local_media_curator.db.repositories import MediaRepository, SourceFolderRepository
@@ -19,13 +20,14 @@ class LibraryService:
     def remove_source_folder(self, path: Path) -> None:
         self._source_folders.remove(path)
 
-    def scan(self) -> ScanResult:
+    def scan(self, cancel_check: Callable[[], bool] | None = None) -> ScanResult:
         total = ScanResult()
         for row in self._source_folders.list_enabled():
             result = scan_source_folder(
                 self._project,
                 Path(row["path"]),
                 recursive=bool(row["recursive"]),
+                cancel_check=cancel_check,
             )
             total.added += result.added
             total.missing += result.missing

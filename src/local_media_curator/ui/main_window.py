@@ -24,6 +24,7 @@ from local_media_curator.ui.media_model import MediaListModel
 from local_media_curator.ui.preview_panel import PreviewPanel
 
 _LIBRARY_VIEW_ROWS = {"all": 0, "unassigned": 1, "rejected": 2}
+_SCAN_STOP_TIMEOUT_MS = 30000
 
 
 class MainWindow(QMainWindow):
@@ -115,14 +116,30 @@ class MainWindow(QMainWindow):
         worker = ScanWorker()
         thread = QThread(self)
         worker.moveToThread(thread)
-        thread.started.connect(lambda: worker.run(db_path))
+        # Direct: a receiverless lambda is bound to the *sender's* thread
+        # affinity (this window), which would queue run() back onto the GUI
+        # thread and block it for the whole scan.
+        thread.started.connect(
+            lambda: worker.run(db_path), Qt.ConnectionType.DirectConnection
+        )
         worker.finished.connect(self._on_scan_finished)
         worker.failed.connect(self._on_scan_failed)
+        worker.cancelled.connect(self._on_scan_cancelled)
         self._scan_worker = worker
         self._scan_thread = thread
         thread.start()
 
     def _on_scan_finished(self, _result: object) -> None:
+        self._stop_scan_thread()
+        self.refresh()
+
+    def _on_scan_cancelled(self) -> None:
+        if self._scan_thread is None:
+            # Cancellation was requested by _stop_scan_thread(), which already
+            # stopped the thread and cleaned up. This delivery is the leftover
+            # queued signal, and refreshing here would touch a project the
+            # window may not own any more.
+            return
         self._stop_scan_thread()
         self.refresh()
 
@@ -133,8 +150,9 @@ class MainWindow(QMainWindow):
     def _stop_scan_thread(self) -> None:
         thread = self._scan_thread
         worker = self._scan_worker
-        self._scan_thread = None
-        self._scan_worker = None
+        if thread is None:
+            self._scan_worker = None
+            return
         if worker is not None:
             for signal, slot in (
                 (worker.finished, self._on_scan_finished),
@@ -144,13 +162,16 @@ class MainWindow(QMainWindow):
                     signal.disconnect(slot)
                 except (RuntimeError, TypeError):
                     pass
-        if thread is None:
-            return
+            worker.cancel()
         if thread.isRunning():
             thread.quit()
-            thread.wait(2000)
+            thread.wait(_SCAN_STOP_TIMEOUT_MS)
         if thread.isRunning():
+            # Still winding down: keep both references so the live thread is
+            # never leaked, and never force it with QThread.terminate().
             return
+        self._scan_thread = None
+        self._scan_worker = None
         if worker is not None:
             worker.deleteLater()
         thread.deleteLater()
