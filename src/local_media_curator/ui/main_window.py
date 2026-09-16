@@ -94,6 +94,7 @@ class MainWindow(QMainWindow):
             return
         if self._scan_thread is not None and self._scan_thread.isRunning():
             return
+        self._stop_scan_thread()
         db_path = str(self.project.db_path)
         worker = ScanWorker()
         thread = QThread(self)
@@ -116,10 +117,16 @@ class MainWindow(QMainWindow):
 
     def _stop_scan_thread(self) -> None:
         thread = self._scan_thread
+        worker = self._scan_worker
+        self._scan_thread = None
+        self._scan_worker = None
         if thread is None:
             return
         thread.quit()
         thread.wait(2000)
+        if worker is not None:
+            worker.deleteLater()
+        thread.deleteLater()
 
     def refresh(self) -> None:
         self._reload_lists()
