@@ -104,6 +104,38 @@ class ListService:
     def list_names_for_media(self, media_id: int) -> list[str]:
         return self._lists.list_names_for_media(media_id)
 
+    def items_with_sort_keys(self, list_id: int) -> list[tuple[int, int]]:
+        return self._lists.items_with_sort_keys(list_id)
+
+    def restore_sort_keys(
+        self, list_id: int, media_keys: list[tuple[int, int]]
+    ) -> None:
+        conn = self._project.connection
+        try:
+            self._lists.set_sort_keys(list_id, media_keys)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+    def snapshot_items(
+        self, list_id: int, media_ids: list[int]
+    ) -> list[tuple[int, int, str]]:
+        return self._lists.items_for_ids(list_id, media_ids)
+
+    def restore_item_rows(
+        self, list_id: int, rows: list[tuple[int, int, str]]
+    ) -> None:
+        if not rows:
+            return
+        conn = self._project.connection
+        try:
+            self._lists.insert_item_rows(list_id, rows)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
     def reorder(self, list_id: int, media_ids_in_order: list[int]) -> None:
         current = self._lists.items_with_sort_keys(list_id)
         new_order = _resolve_order(current, media_ids_in_order)

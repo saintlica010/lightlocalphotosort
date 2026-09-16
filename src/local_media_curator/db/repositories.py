@@ -135,6 +135,16 @@ class MediaRepository:
             (int(rejected), *media_ids),
         )
 
+    def rejection_states(self, media_ids: list[int]) -> dict[int, bool]:
+        if not media_ids:
+            return {}
+        placeholders = ",".join("?" * len(media_ids))
+        rows = self._conn.execute(
+            f"SELECT id, rejected FROM media WHERE id IN ({placeholders})",
+            tuple(media_ids),
+        )
+        return {int(row[0]): bool(row[1]) for row in rows}
+
     def list_media(
         self,
         *,
@@ -234,6 +244,34 @@ class ListRepository:
             self._conn.execute(
                 "UPDATE list_items SET sort_key = ? WHERE list_id = ? AND media_id = ?",
                 (sort_key, list_id, media_id),
+            )
+
+    def items_for_ids(
+        self, list_id: int, media_ids: list[int]
+    ) -> list[tuple[int, int, str]]:
+        if not media_ids:
+            return []
+        placeholders = ",".join("?" * len(media_ids))
+        rows = self._conn.execute(
+            f"""
+            SELECT media_id, sort_key, added_at
+            FROM list_items
+            WHERE list_id = ? AND media_id IN ({placeholders})
+            """,
+            (list_id, *media_ids),
+        )
+        return [(int(row[0]), int(row[1]), str(row[2])) for row in rows]
+
+    def insert_item_rows(
+        self, list_id: int, rows: list[tuple[int, int, str]]
+    ) -> None:
+        for media_id, sort_key, added_at in rows:
+            self._conn.execute(
+                """
+                INSERT INTO list_items (list_id, media_id, sort_key, added_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (list_id, media_id, sort_key, added_at),
             )
 
     def remove_items(self, list_id: int, media_ids: list[int]) -> None:

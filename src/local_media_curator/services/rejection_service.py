@@ -16,3 +16,6 @@ class RejectionService:
     def restore(self, media_ids: list[int]) -> None:
         self._media.set_rejected(media_ids, False)
         self._project.connection.commit()
+
+    def states(self, media_ids: list[int]) -> dict[int, bool]:
+        return self._media.rejection_states(media_ids)
