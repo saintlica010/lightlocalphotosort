@@ -37,3 +37,11 @@ def test_create_project_refuses_photos_tree(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="photos"):
         create_project(tmp_path / "photos" / "proj")
     assert not (tmp_path / "photos" / "proj").exists()
+
+
+def test_open_project_refuses_photos_tree(tmp_path: Path) -> None:
+    root = tmp_path / "photos" / "proj"
+    root.mkdir(parents=True)
+    (root / "project.sqlite3").write_bytes(b"")
+    with pytest.raises(ValueError, match="photos"):
+        open_project(root)

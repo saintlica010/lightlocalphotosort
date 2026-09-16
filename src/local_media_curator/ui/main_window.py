@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import QModelIndex, Qt, QThread
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter, QWidget
 
 from local_media_curator.domain.models import Media, Project
@@ -37,6 +37,7 @@ class MainWindow(QMainWindow):
         self.thumbnail_pool: ThumbnailPool | None = None
         self.undo_stack: CurationUndoStack | None = None
         self.list_name_picker: Callable[[list[str]], str | None] | None = None
+        self.confirm_delete: Callable[[str], bool] | None = None
         self._view_mode = "all"
         self._current_list_id: int | None = None
         self._sort_by = "file_name"
@@ -71,6 +72,7 @@ class MainWindow(QMainWindow):
         self.undo_stack = stack
 
     def set_project(self, project: Project) -> None:
+        self._stop_scan_thread()
         previous = self.project
         self.project = project
         self.library_service = LibraryService(project)
@@ -131,13 +133,29 @@ class MainWindow(QMainWindow):
         worker = self._scan_worker
         self._scan_thread = None
         self._scan_worker = None
+        if worker is not None:
+            for signal, slot in (
+                (worker.finished, self._on_scan_finished),
+                (worker.failed, self._on_scan_failed),
+            ):
+                try:
+                    signal.disconnect(slot)
+                except (RuntimeError, TypeError):
+                    pass
         if thread is None:
             return
-        thread.quit()
-        thread.wait(2000)
+        if thread.isRunning():
+            thread.quit()
+            thread.wait(2000)
+        if thread.isRunning():
+            return
         if worker is not None:
             worker.deleteLater()
         thread.deleteLater()
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._stop_scan_thread()
+        super().closeEvent(event)
 
     def refresh(self) -> None:
         self._reload_lists()
@@ -396,6 +414,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self, "Open Project", "No project found in that folder."
             )
+        except ValueError as exc:
+            QMessageBox.warning(self, "Open Project", str(exc))
 
     def _on_add_source_folder(self) -> None:
         if self.library_service is None:
@@ -498,11 +518,39 @@ class MainWindow(QMainWindow):
     def _on_delete_list(self, list_id: int) -> None:
         if self.list_service is None:
             return
+        name = next(
+            (
+                str(row["name"])
+                for row in self.list_service.all_lists()
+                if int(row["id"]) == list_id
+            ),
+            None,
+        )
+        if name is None:
+            return
+        confirmer = self.confirm_delete
+        allowed = (
+            confirmer(name)
+            if confirmer is not None
+            else self._confirm_delete_dialog(name)
+        )
+        if not allowed:
+            return
         self.list_service.delete(list_id)
         if self._current_list_id == list_id:
             self.show_library_view("all")
             return
         self.refresh()
+
+    def _confirm_delete_dialog(self, name: str) -> bool:
+        answer = QMessageBox.question(
+            self,
+            "Delete list",
+            f'Delete list "{name}"? Original media files are not deleted.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes
 
     def _target_list_id(self) -> int | None:
         if self._current_list_id is not None:

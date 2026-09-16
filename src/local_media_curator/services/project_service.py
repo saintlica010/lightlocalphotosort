@@ -45,6 +45,7 @@ def create_project(root: Path) -> Project:
 
 def open_project(root: Path) -> Project:
     root = root.resolve()
+    _reject_protected_project_root(root)
     db_path = root / _DB_NAME
     if not db_path.is_file():
         raise FileNotFoundError(db_path)

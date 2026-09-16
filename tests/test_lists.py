@@ -1,6 +1,8 @@
 import hashlib
+import sqlite3
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from local_media_curator.services.library_service import LibraryService
@@ -75,6 +77,60 @@ def test_create_duplicate_list_name_does_not_raise(tmp_path: Path) -> None:
     assert first == second
     names = [row["name"] for row in lists.all_lists()]
     assert names == ["A"]
+    project.close()
+
+
+def test_rename_duplicate_list_name_raises_and_keeps_original(tmp_path: Path) -> None:
+    project, lists, _ids, _source = _setup(tmp_path)
+    lists.create("A")
+    b_id = lists.create("B")
+    with pytest.raises(sqlite3.IntegrityError):
+        lists.rename(b_id, "A")
+    name = project.connection.execute(
+        "SELECT name FROM lists WHERE id = ?",
+        (b_id,),
+    ).fetchone()[0]
+    assert name == "B"
+    project.close()
+
+
+def test_rename_duplicate_list_shows_warning(qtbot, tmp_path: Path, monkeypatch) -> None:
+    project = create_project(tmp_path / "proj")
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    window.list_service.create("A")
+    b_id = window.list_service.create("B")
+    shown: list[str] = []
+
+    def fake_warning(_parent, title, text):
+        shown.append(f"{title}: {text}")
+        return 0
+
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.QMessageBox.warning",
+        fake_warning,
+    )
+    window._on_rename_list(b_id, "A")
+    assert shown
+    assert "already exists" in shown[0]
+    names = {int(row["id"]): str(row["name"]) for row in window.list_service.all_lists()}
+    assert names[b_id] == "B"
+    project.close()
+
+
+def test_delete_list_requires_confirmation(qtbot, tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    list_id = window.list_service.create("Promotional")
+    window.confirm_delete = lambda _name: False
+    window._on_delete_list(list_id)
+    assert [row["name"] for row in window.list_service.all_lists()] == ["Promotional"]
+    window.confirm_delete = lambda name: name == "Promotional"
+    window._on_delete_list(list_id)
+    assert window.list_service.all_lists() == []
     project.close()
 
 

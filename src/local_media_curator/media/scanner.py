@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import sqlite3
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 
@@ -24,17 +26,31 @@ def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
-def _iter_media_files(folder: Path, recursive: bool):
+def _is_under_dir(path: Path, root: Path) -> bool:
+    child = normalize_path(path)
+    parent = normalize_path(root)
+    if child == parent:
+        return True
+    return child.startswith(parent + os.sep)
+
+
+def _iter_media_files(
+    folder: Path, recursive: bool, skip_dirs: Iterable[Path] = ()
+):
     if not folder.is_dir():
         return
+    skipped = tuple(skip_dirs)
     iterator = folder.rglob("*") if recursive else folder.iterdir()
     for path in iterator:
         try:
             is_file = path.is_file()
         except OSError:
             continue
-        if is_file and path.suffix.lower() in SUPPORTED_EXTENSIONS:
-            yield path
+        if not is_file or path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            continue
+        if any(_is_under_dir(path, skip) for skip in skipped):
+            continue
+        yield path
 
 
 def _read_fields(path: Path, ext: str, stat_result) -> tuple[str, int | None, int | None, str]:
@@ -60,7 +76,9 @@ def scan_source_folder(
     seen: set[str] = set()
 
     try:
-        for path in _iter_media_files(folder, recursive):
+        for path in _iter_media_files(
+            folder, recursive, skip_dirs=(project.thumbnails_dir,)
+        ):
             try:
                 stat_result = path.stat()
             except OSError:

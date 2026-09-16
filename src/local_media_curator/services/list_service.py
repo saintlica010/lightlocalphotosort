@@ -105,6 +105,7 @@ class ListService:
             conn.commit()
         except sqlite3.IntegrityError:
             conn.rollback()
+            raise
 
     def delete(self, list_id: int) -> None:
         self._lists.delete(list_id)

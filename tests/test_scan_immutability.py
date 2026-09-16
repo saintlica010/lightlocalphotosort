@@ -60,6 +60,24 @@ def test_scan_rolls_back_on_write_failure(tmp_path: Path, monkeypatch) -> None:
     project.close()
 
 
+def test_scan_skips_files_under_thumbnails_dir(tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "src"
+    source.mkdir()
+    Image.new("RGB", (10, 10)).save(source / "A.jpg", "JPEG")
+    Image.new("RGB", (10, 10)).save(project.thumbnails_dir / "cached.jpg", "JPEG")
+    lib = LibraryService(project)
+    lib.add_source_folder(tmp_path)
+    lib.scan()
+    names = {
+        str(row[0])
+        for row in project.connection.execute("SELECT file_name FROM media")
+    }
+    assert "A.jpg" in names
+    assert "cached.jpg" not in names
+    project.close()
+
+
 def test_scan_read_only_source_directory(tmp_path: Path) -> None:
     project = create_project(tmp_path / "proj")
     source = tmp_path / "src"

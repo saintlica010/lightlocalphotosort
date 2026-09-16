@@ -57,3 +57,38 @@ def test_main_window_scan_clears_thread_refs(qtbot, tmp_path: Path) -> None:
 
     assert window._scan_worker is None
     assert window.findChildren(QThread) == []
+
+
+def test_close_event_stops_scan_thread(qtbot, tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "src"
+    source.mkdir()
+    Image.new("RGB", (20, 20)).save(source / "A.jpg", "JPEG")
+    LibraryService(project).add_source_folder(source)
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    window.scan()
+    window.close()
+    assert window._scan_thread is None
+    assert window._scan_worker is None
+
+
+def test_set_project_stops_scan_before_switching(qtbot, tmp_path: Path) -> None:
+    first = create_project(tmp_path / "first")
+    second = create_project(tmp_path / "second")
+    source = tmp_path / "src"
+    source.mkdir()
+    Image.new("RGB", (20, 20)).save(source / "A.jpg", "JPEG")
+    LibraryService(first).add_source_folder(source)
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(first)
+    window.scan()
+    window.set_project(second)
+    assert window._scan_thread is None
+    assert window._scan_worker is None
+    assert window.project is second
+    second.close()
