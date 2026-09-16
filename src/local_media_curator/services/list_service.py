@@ -68,6 +68,16 @@ class ListService:
         self._project = project
         self._lists = ListRepository(project.connection)
 
+    def all_lists(self) -> list[dict[str, object]]:
+        return [
+            {
+                "id": int(row["id"]),
+                "name": str(row["name"]),
+                "description": row["description"],
+            }
+            for row in self._lists.list_all()
+        ]
+
     def create(self, name: str, description: str | None = None) -> int:
         now = _now_iso()
         list_id = self._lists.insert(

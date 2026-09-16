@@ -41,3 +41,9 @@ class LibraryService:
             rejected_only=rejected_only,
         )
         return [Media.from_row(row) for row in rows]
+
+    def list_unassigned(self) -> list[Media]:
+        return [Media.from_row(row) for row in self._media.list_unassigned()]
+
+    def list_media_by_ids(self, media_ids: list[int]) -> list[Media]:
+        return [Media.from_row(row) for row in self._media.get_by_ids(media_ids)]

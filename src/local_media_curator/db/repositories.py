@@ -159,10 +159,44 @@ class MediaRepository:
             sql = "SELECT * FROM media WHERE rejected = 0 ORDER BY id"
         return list(self._conn.execute(sql))
 
+    def list_unassigned(self) -> list[sqlite3.Row]:
+        return list(
+            self._conn.execute(
+                """
+                SELECT * FROM media
+                WHERE rejected = 0
+                  AND id NOT IN (SELECT media_id FROM list_items)
+                ORDER BY id
+                """
+            )
+        )
+
+    def get_by_ids(self, media_ids: list[int]) -> list[sqlite3.Row]:
+        if not media_ids:
+            return []
+        placeholders = ",".join("?" * len(media_ids))
+        rows = self._conn.execute(
+            f"SELECT * FROM media WHERE id IN ({placeholders})",
+            tuple(media_ids),
+        )
+        by_id = {int(row["id"]): row for row in rows}
+        return [by_id[media_id] for media_id in media_ids if media_id in by_id]
+
 
 class ListRepository:
     def __init__(self, connection: sqlite3.Connection) -> None:
         self._conn = connection
+
+    def list_all(self) -> list[sqlite3.Row]:
+        return list(
+            self._conn.execute(
+                """
+                SELECT id, name, description, created_at, updated_at
+                FROM lists
+                ORDER BY name COLLATE NOCASE, id
+                """
+            )
+        )
 
     def insert(
         self,

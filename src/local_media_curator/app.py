@@ -20,3 +20,10 @@ def bind_undo_stack(window: MainWindow, project: Project) -> CurationUndoStack:
     stack = CurationUndoStack(project)
     window.set_undo_stack(stack)
     return stack
+
+
+def run() -> int:
+    app = create_app()
+    window = MainWindow()
+    window.show()
+    return app.exec()

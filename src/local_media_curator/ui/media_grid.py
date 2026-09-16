@@ -42,3 +42,23 @@ class MediaGrid(QWidget):
     @property
     def model(self) -> MediaListModel:
         return self._model
+
+    def selected_ids(self) -> list[int]:
+        ids: list[int] = []
+        seen: set[int] = set()
+        selection = self._view.selectionModel()
+        indexes = selection.selectedIndexes() if selection is not None else []
+        if not indexes:
+            current = self._view.currentIndex()
+            if current.isValid():
+                indexes = [current]
+        for index in indexes:
+            value = self._model.data(index, MediaListModel.IdRole)
+            if value is None:
+                continue
+            media_id = int(value)
+            if media_id in seen:
+                continue
+            seen.add(media_id)
+            ids.append(media_id)
+        return ids

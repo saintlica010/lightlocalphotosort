@@ -1,12 +1,8 @@
-from local_media_curator.app import create_app
-from local_media_curator.ui.main_window import MainWindow
+from local_media_curator.app import run
 
 
 def main() -> None:
-    app = create_app()
-    window = MainWindow()
-    window.show()
-    raise SystemExit(app.exec())
+    raise SystemExit(run())
 
 
 if __name__ == "__main__":
