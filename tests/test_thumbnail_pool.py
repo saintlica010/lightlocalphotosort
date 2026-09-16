@@ -66,3 +66,20 @@ def test_set_thumbnail_path_emits_data_changed(qtbot) -> None:
     assert resets == []
     assert model.data(model.index(1), MediaListModel.ThumbnailPathRole) == "/tmp/b.webp"
     assert model.data(model.index(0), MediaListModel.ThumbnailPathRole) is None
+
+
+def test_pool_sync_bounds_pending_and_promotes_visible(qtbot, tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    pool = ThumbnailPool(project)
+    needed = {i: str(tmp_path / f"{i}.jpg") for i in range(10_000)}
+    pool.sync(needed, visible_ids=list(range(10)))
+    assert len(pool.pending_ids()) + len(pool.inflight_ids()) <= 64
+    first_pending = pool.pending_ids()
+    assert 9999 not in first_pending
+    pool.sync(needed, visible_ids=[9999])
+    ordered = list(pool.inflight_ids()) + pool.pending_ids()
+    assert 9999 in ordered
+    assert ordered[0] == 9999 or 9999 in pool.inflight_ids()
+    assert len(pool.pending_ids()) + len(pool.inflight_ids()) <= 64
+    pool.clear()
+    project.close()

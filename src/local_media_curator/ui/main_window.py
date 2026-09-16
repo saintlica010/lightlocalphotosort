@@ -43,6 +43,7 @@ class MainWindow(QMainWindow):
         self._sort_by = "file_name"
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
+        self._thumb_needed: dict[int, str] = {}
 
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.library_panel = LibraryPanel()
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow):
         self.media_grid.view.selectionModel().currentChanged.connect(
             self._on_media_current_changed
         )
+        self.media_grid.viewportRowsChanged.connect(self._on_viewport_rows_changed)
         self.library_panel.view_changed.connect(self._on_library_view_changed)
         self.library_panel.sort_changed.connect(self._on_library_sort_changed)
         self.library_panel.list_panel.current_list_changed.connect(
@@ -598,6 +600,9 @@ class MainWindow(QMainWindow):
 
     def _reload_grid(self) -> None:
         if self.library_service is None:
+            self._thumb_needed = {}
+            if self.thumbnail_pool is not None:
+                self.thumbnail_pool.clear()
             self.media_grid.model.set_rows([])
             self.preview_panel.set_media(None)
             self.media_grid.set_manual_order_enabled(False)
@@ -621,6 +626,7 @@ class MainWindow(QMainWindow):
             for ordinal, item in enumerate(items, start=1)
         ]
         jobs = self._thumbnail_jobs(items, rows)
+        self._thumb_needed = {media_id: path for media_id, path in jobs}
         self.media_grid.model.set_rows(rows)
         self.media_grid.set_manual_order_enabled(list_mode)
         self._set_reorder_actions_enabled(list_mode)
@@ -630,8 +636,7 @@ class MainWindow(QMainWindow):
             self.preview_panel.set_media(self.media_grid.model.row_at(current.row()))
         else:
             self.preview_panel.set_media(None)
-        if self.thumbnail_pool is not None and jobs:
-            self.thumbnail_pool.request(jobs)
+        self._sync_thumbnails()
 
     def _set_order_status(self, list_mode: bool) -> None:
         if list_mode:
@@ -716,7 +721,27 @@ class MainWindow(QMainWindow):
         return str(cached) if cached is not None else None
 
     def _on_thumbnail_ready(self, media_id: int, path: str) -> None:
+        self._thumb_needed.pop(int(media_id), None)
         self.media_grid.model.set_thumbnail_path(int(media_id), path)
+
+    def _on_viewport_rows_changed(self, _first: int, _last: int) -> None:
+        self._sync_thumbnails()
+
+    def _sync_thumbnails(self) -> None:
+        if self.thumbnail_pool is None:
+            return
+        first, last = self.media_grid.visible_row_range()
+        visible_ids: list[int] = []
+        model = self.media_grid.model
+        for row in range(first, last + 1):
+            record = model.row_at(row)
+            if record is None or record.get("thumbnail_path"):
+                continue
+            media_id = record.get("id")
+            if media_id is None:
+                continue
+            visible_ids.append(int(media_id))
+        self.thumbnail_pool.sync(self._thumb_needed, visible_ids)
 
     def _on_media_current_changed(
         self, current: QModelIndex, _previous: QModelIndex
