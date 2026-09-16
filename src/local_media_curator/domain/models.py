@@ -15,3 +15,19 @@ class Project:
 
     def close(self) -> None:
         self.connection.close()
+
+
+@dataclass
+class ImageMetadata:
+    size: int
+    width: int
+    height: int
+    captured_at: str
+
+
+@dataclass
+class ScanResult:
+    added: int = 0
+    missing: int = 0
+    unchanged: int = 0
+    modified: int = 0
