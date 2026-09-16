@@ -4,6 +4,7 @@ import os
 import sqlite3
 from pathlib import Path
 
+from local_media_curator.domain.ordering import next_sort_key
 from local_media_curator.domain.paths import normalize_path
 
 
@@ -126,9 +127,6 @@ class MediaRepository:
         )
 
 
-SORT_KEY_GAP = 1024
-
-
 class ListRepository:
     def __init__(self, connection: sqlite3.Connection) -> None:
         self._conn = connection
@@ -187,7 +185,7 @@ class ListRepository:
             "SELECT MAX(sort_key) FROM list_items WHERE list_id = ?",
             (list_id,),
         ).fetchone()[0]
-        next_key = int(max_key or 0) + SORT_KEY_GAP
+        next_key = next_sort_key(int(max_key) if max_key is not None else None)
         for media_id in media_ids:
             if media_id in existing:
                 continue
@@ -199,7 +197,21 @@ class ListRepository:
                 (list_id, media_id, next_key, added_at),
             )
             existing.add(media_id)
-            next_key += SORT_KEY_GAP
+            next_key = next_sort_key(next_key)
+
+    def items_with_sort_keys(self, list_id: int) -> list[tuple[int, int]]:
+        rows = self._conn.execute(
+            "SELECT media_id, sort_key FROM list_items WHERE list_id = ? ORDER BY sort_key",
+            (list_id,),
+        )
+        return [(int(row[0]), int(row[1])) for row in rows]
+
+    def set_sort_keys(self, list_id: int, media_keys: list[tuple[int, int]]) -> None:
+        for media_id, sort_key in media_keys:
+            self._conn.execute(
+                "UPDATE list_items SET sort_key = ? WHERE list_id = ? AND media_id = ?",
+                (sort_key, list_id, media_id),
+            )
 
     def remove_items(self, list_id: int, media_ids: list[int]) -> None:
         if not media_ids:

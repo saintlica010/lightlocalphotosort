@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QSize
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QAbstractItemView, QListView, QVBoxLayout, QWidget
 
 from local_media_curator.ui.media_model import MediaListModel
@@ -25,6 +25,15 @@ class MediaGrid(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._view)
+
+    def set_manual_order_enabled(self, enabled: bool) -> None:
+        if enabled:
+            self._view.setMovement(QListView.Movement.Snap)
+            self._view.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+            self._view.setDefaultDropAction(Qt.DropAction.MoveAction)
+        else:
+            self._view.setMovement(QListView.Movement.Static)
+            self._view.setDragDropMode(QAbstractItemView.DragDropMode.NoDragDrop)
 
     @property
     def view(self) -> QListView:
