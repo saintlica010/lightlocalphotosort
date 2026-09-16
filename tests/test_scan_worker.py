@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 
 from PIL import Image
-from PySide6.QtCore import QThread
+from PySide6.QtCore import Qt, QThread
 from PySide6.QtWidgets import QApplication
 
 from local_media_curator.db.connection import connect
@@ -20,22 +20,37 @@ def test_connect_enables_wal(tmp_path: Path) -> None:
     conn.close()
 
 
-def test_scan_worker_does_not_block_and_persists(qtbot, tmp_path: Path) -> None:
+def test_scan_worker_does_not_block_and_persists(qtbot, tmp_path: Path, monkeypatch) -> None:
     project = create_project(tmp_path / "proj")
     source = tmp_path / "src"
     source.mkdir()
     Image.new("RGB", (20, 20)).save(source / "A.jpg", "JPEG")
     LibraryService(project).add_source_folder(source)
 
+    scan_threads: list[threading.Thread] = []
+    real_scan = LibraryService.scan
+
+    def recording_scan(self, cancel_check=None):
+        scan_threads.append(threading.current_thread())
+        return real_scan(self, cancel_check=cancel_check)
+
+    monkeypatch.setattr(LibraryService, "scan", recording_scan)
+
     worker = ScanWorker()
     thread = QThread()
     worker.moveToThread(thread)
-    thread.started.connect(lambda: worker.run(str(project.db_path)))
+    # Same shape as MainWindow.scan(): a receiverless lambda binds to the
+    # *sender's* thread affinity, which would queue run() onto the GUI thread.
+    thread.started.connect(
+        lambda: worker.run(str(project.db_path)), Qt.ConnectionType.DirectConnection
+    )
     with qtbot.waitSignal(worker.finished, timeout=8000):
         thread.start()
     thread.quit()
     thread.wait(2000)
 
+    assert scan_threads
+    assert scan_threads[0] is not threading.main_thread()
     count = project.connection.execute("SELECT COUNT(*) FROM media").fetchone()[0]
     assert count == 1
     project.close()
