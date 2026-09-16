@@ -124,3 +124,101 @@ class MediaRepository:
             "UPDATE media SET missing = ? WHERE id = ?",
             (int(missing), media_id),
         )
+
+
+SORT_KEY_GAP = 1024
+
+
+class ListRepository:
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._conn = connection
+
+    def insert(
+        self,
+        *,
+        name: str,
+        description: str | None,
+        created_at: str,
+        updated_at: str,
+    ) -> int:
+        cur = self._conn.execute(
+            """
+            INSERT INTO lists (name, description, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (name, description, created_at, updated_at),
+        )
+        return int(cur.lastrowid)
+
+    def rename(self, list_id: int, name: str, updated_at: str) -> None:
+        self._conn.execute(
+            "UPDATE lists SET name = ?, updated_at = ? WHERE id = ?",
+            (name, updated_at, list_id),
+        )
+
+    def delete(self, list_id: int) -> None:
+        self._conn.execute("DELETE FROM lists WHERE id = ?", (list_id,))
+
+    def count_items(self, list_id: int) -> int:
+        row = self._conn.execute(
+            "SELECT COUNT(*) FROM list_items WHERE list_id = ?",
+            (list_id,),
+        ).fetchone()
+        return int(row[0])
+
+    def ordered_media_ids(self, list_id: int) -> list[int]:
+        rows = self._conn.execute(
+            "SELECT media_id FROM list_items WHERE list_id = ? ORDER BY sort_key",
+            (list_id,),
+        )
+        return [int(row[0]) for row in rows]
+
+    def add_items(self, list_id: int, media_ids: list[int], added_at: str) -> None:
+        if not media_ids:
+            return
+        existing = {
+            int(row[0])
+            for row in self._conn.execute(
+                "SELECT media_id FROM list_items WHERE list_id = ?",
+                (list_id,),
+            )
+        }
+        max_key = self._conn.execute(
+            "SELECT MAX(sort_key) FROM list_items WHERE list_id = ?",
+            (list_id,),
+        ).fetchone()[0]
+        next_key = int(max_key or 0) + SORT_KEY_GAP
+        for media_id in media_ids:
+            if media_id in existing:
+                continue
+            self._conn.execute(
+                """
+                INSERT INTO list_items (list_id, media_id, sort_key, added_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (list_id, media_id, next_key, added_at),
+            )
+            existing.add(media_id)
+            next_key += SORT_KEY_GAP
+
+    def remove_items(self, list_id: int, media_ids: list[int]) -> None:
+        if not media_ids:
+            return
+        placeholders = ",".join("?" * len(media_ids))
+        self._conn.execute(
+            f"DELETE FROM list_items WHERE list_id = ? AND media_id IN ({placeholders})",
+            (list_id, *media_ids),
+        )
+
+    def list_names_for_media(self, media_id: int) -> list[str]:
+        rows = self._conn.execute(
+            """
+            SELECT lists.name
+            FROM list_items
+            JOIN lists ON lists.id = list_items.list_id
+            WHERE list_items.media_id = ?
+            ORDER BY lists.name
+            """,
+            (media_id,),
+        )
+        return [str(row[0]) for row in rows]

@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QModelIndex, Qt
 from PySide6.QtWidgets import QMainWindow, QSplitter, QWidget
 
+from local_media_curator.ui.library_panel import LibraryPanel
 from local_media_curator.ui.media_grid import MediaGrid
 from local_media_curator.ui.preview_panel import PreviewPanel
 
@@ -11,7 +12,7 @@ class MainWindow(QMainWindow):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
-        self.library_panel = QWidget()
+        self.library_panel = LibraryPanel()
         self.media_grid = MediaGrid()
         self.preview_panel = PreviewPanel()
         splitter.addWidget(self.library_panel)
