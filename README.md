@@ -6,15 +6,21 @@ This is **not** a general-purpose DAM. Processing stays on the machine. Source m
 
 ## Status
 
-Phase 1 MVP is usable locally: create or open a project, add a source folder, scan, maintain virtual lists, reject/restore, and undo.
+Phase 1 MVP is usable on Windows 10/11: create or open a project, add a source folder, scan, maintain virtual lists, reject/restore, and undo.
 
-Stack: Python 3.12+, PySide6, SQLite, Pillow. PyInstaller packaging is not in this pass.
+Stack: Python 3.12+, PySide6, SQLite, Pillow. Windows packaging is a one-folder PyInstaller build.
 
 See `AGENTS.md` for product rules, data-safety constraints, and the Phase 1 build order.
 
-## Usage
+## Requirements
+
+- Windows 10/11
+- Python 3.12 or newer for source installs
+
+## Install and run from source
 
 ```text
+python -m pip install -e ".[dev]"
 python -m local_media_curator
 ```
 
@@ -22,6 +28,41 @@ python -m local_media_curator
 2. **Add Source Folder**, then **Scan** (F5). Source files are never moved, renamed, or rewritten.
 3. Browse All / Unassigned / Rejected, or create named virtual lists.
 4. **Add to List** (from All Media, pick a list), reject/restore, reorder a named list with `[` / `]` or Ctrl+Up/Down, and undo.
+
+## Packaged Windows build
+
+```text
+python -m pip install pyinstaller
+python -m PyInstaller build/local_media_curator.spec
+```
+
+Or:
+
+```text
+python -m pip install -e ".[packaging]"
+powershell -File scripts/build_windows.ps1
+```
+
+Run the packaged app:
+
+```text
+dist/local_media_curator/local_media_curator.exe
+```
+
+The spec is one-folder (`COLLECT`), not one-file. It does not bundle user media or planning trees.
+
+## Project data and backup
+
+Application state lives in the project folder you create or open, not next to source media:
+
+```text
+MyProject/
+    project.sqlite3
+    thumbnails/
+    logs/
+```
+
+Backup = copy that project folder. Restoring is opening the copied folder. Original photos and videos stay in their source directories.
 
 ## Local reference data (not in Git)
 

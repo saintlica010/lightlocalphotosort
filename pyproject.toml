@@ -17,6 +17,9 @@ dev = [
     "pytest",
     "pytest-qt",
 ]
+packaging = [
+    "pyinstaller",
+]
 
 [project.scripts]
 local-media-curator = "local_media_curator.__main__:main"

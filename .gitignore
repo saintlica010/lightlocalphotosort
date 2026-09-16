@@ -20,7 +20,8 @@ __pycache__/
 *.egg-info/
 .eggs/
 dist/
-build/
+build/*
+!build/local_media_curator.spec
 .venv/
 venv/
 .env
