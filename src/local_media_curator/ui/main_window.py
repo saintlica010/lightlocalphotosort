@@ -4,11 +4,12 @@ import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QModelIndex, Qt
+from PySide6.QtCore import QModelIndex, Qt, QThread
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter, QWidget
 
 from local_media_curator.domain.models import Media, Project
+from local_media_curator.media.scan_worker import ScanWorker
 from local_media_curator.media.thumbnail_service import ThumbnailService
 from local_media_curator.services.library_service import LibraryService
 from local_media_curator.services.list_service import ListService
@@ -36,6 +37,8 @@ class MainWindow(QMainWindow):
         self.list_name_picker: Callable[[list[str]], str | None] | None = None
         self._view_mode = "all"
         self._current_list_id: int | None = None
+        self._scan_thread: QThread | None = None
+        self._scan_worker: ScanWorker | None = None
 
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.library_panel = LibraryPanel()
@@ -87,11 +90,36 @@ class MainWindow(QMainWindow):
         self.library_service.add_source_folder(path)
 
     def scan(self) -> None:
-        if self.library_service is None:
+        if self.project is None:
             return
-        self.library_service.scan()
+        if self._scan_thread is not None and self._scan_thread.isRunning():
+            return
+        db_path = str(self.project.db_path)
+        worker = ScanWorker()
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        thread.started.connect(lambda: worker.run(db_path))
+        worker.finished.connect(self._on_scan_finished)
+        worker.failed.connect(self._on_scan_failed)
+        self._scan_worker = worker
+        self._scan_thread = thread
+        thread.start()
+
+    def _on_scan_finished(self, _result: object) -> None:
+        self._stop_scan_thread()
         self._ensure_thumbnails()
         self.refresh()
+
+    def _on_scan_failed(self, message: str) -> None:
+        self._stop_scan_thread()
+        QMessageBox.warning(self, "Scan", message)
+
+    def _stop_scan_thread(self) -> None:
+        thread = self._scan_thread
+        if thread is None:
+            return
+        thread.quit()
+        thread.wait(2000)
 
     def refresh(self) -> None:
         self._reload_lists()

@@ -24,6 +24,10 @@ def _open_scanned_window(qtbot, tmp_path: Path, names: tuple[str, ...] = ("A.jpg
     window.set_project(project)
     window.add_source_folder(source)
     window.scan()
+    qtbot.waitUntil(
+        lambda: window.media_grid.model.rowCount() == len(names),
+        timeout=8000,
+    )
     return window, project, source
 
 
