@@ -56,3 +56,31 @@ def test_missing_media_detected_without_deleting_database_row(tmp_path: Path) ->
     assert row["missing"] == 1
     assert row["file_name"] == "A.jpg"
     project.close()
+
+
+def test_folder_prefix_underscore_does_not_mark_sibling_missing(tmp_path: Path) -> None:
+    """LIKE '_' must not treat sibling folders such as img_2024 vs imgX2024 as the same prefix."""
+    project = create_project(tmp_path / "proj")
+    underscore = tmp_path / "img_2024"
+    sibling = tmp_path / "imgX2024"
+    underscore.mkdir()
+    sibling.mkdir()
+    gone = underscore / "a.jpg"
+    keep = sibling / "b.jpg"
+    _jpg(gone)
+    _jpg(keep)
+    svc = LibraryService(project)
+    svc.add_source_folder(underscore)
+    svc.add_source_folder(sibling)
+    first = svc.scan()
+    assert first.added == 2
+    gone.unlink()
+    second = svc.scan()
+    assert second.missing == 1
+    rows = {
+        r["file_name"]: r["missing"]
+        for r in project.connection.execute("SELECT file_name, missing FROM media")
+    }
+    assert rows["a.jpg"] == 1
+    assert rows["b.jpg"] == 0
+    project.close()

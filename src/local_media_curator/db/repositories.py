@@ -50,10 +50,11 @@ class MediaRepository:
 
     def list_under_folder(self, folder_normalized: str) -> list[sqlite3.Row]:
         prefix = folder_normalized.rstrip("\\/") + os.sep
+        # Exact prefix match — avoid LIKE so '_' / '%' in paths are not wildcards.
         return list(
             self._conn.execute(
-                "SELECT * FROM media WHERE normalized_path LIKE ?",
-                (prefix + "%",),
+                "SELECT * FROM media WHERE substr(normalized_path, 1, ?) = ?",
+                (len(prefix), prefix),
             )
         )
 
