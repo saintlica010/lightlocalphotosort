@@ -162,7 +162,7 @@ class MainWindow(QMainWindow):
 
     def _on_scan_failed(self, message: str) -> None:
         self._stop_scan_thread()
-        self._set_order_status(self._view_mode == "list")
+        self._set_order_status()
         QMessageBox.warning(self, "Scan", message)
 
     def _stop_scan_thread(self) -> None:
@@ -725,9 +725,10 @@ class MainWindow(QMainWindow):
         jobs = self._thumbnail_jobs(items, rows)
         self._thumb_needed = {media_id: path for media_id, path in jobs}
         self.media_grid.model.set_rows(rows)
-        self.media_grid.set_manual_order_enabled(list_mode)
-        self._set_reorder_actions_enabled(list_mode)
-        self._set_order_status(list_mode)
+        reorder_enabled = list_mode and not self._filters_active()
+        self.media_grid.set_manual_order_enabled(reorder_enabled)
+        self._set_reorder_actions_enabled(reorder_enabled)
+        self._set_order_status()
         self._sync_thumbnails()
         to_restore = selected if selected else self._pending_selection
         present = [media_id for media_id in to_restore if media_id in present_ids]
@@ -739,11 +740,27 @@ class MainWindow(QMainWindow):
                 self._pending_selection = selected
             self.preview_panel.set_media(None)
 
-    def _set_order_status(self, list_mode: bool) -> None:
-        if list_mode:
-            self.statusBar().showMessage("List (manual order)")
-        else:
+    def _filters_active(self) -> bool:
+        """True when any display filter is narrowing the current view.
+
+        A filter can hide members of a manually ordered list, so reordering
+        must be locked while one is active: reordering a filtered subset would
+        otherwise move the hidden members too (AGENTS.md §20).
+        """
+        return any(value is not None for value in self._current_filters().values())
+
+    def _set_order_status(self) -> None:
+        """Show whether the view is sorted or manually ordered.
+
+        Derives the state itself so a caller cannot pass a stale flag; the
+        status must always agree with the reorder controls set alongside it.
+        """
+        if self._view_mode != "list":
             self.statusBar().showMessage("Library (sorted)")
+        elif self._filters_active():
+            self.statusBar().showMessage("名单（已筛选，排序已禁用）")
+        else:
+            self.statusBar().showMessage("List (manual order)")
 
     def _media_for_current_view(self) -> list[Media]:
         assert self.library_service is not None
