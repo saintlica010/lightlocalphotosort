@@ -1,3 +1,4 @@
+import sqlite3
 import threading
 import time
 from pathlib import Path
@@ -191,3 +192,73 @@ def test_set_project_cancels_running_scan_thread(qtbot, tmp_path: Path, monkeypa
     qtbot.waitUntil(lambda: window.findChildren(QThread) == [], timeout=15000)
     assert window.project is second
     second.close()
+
+
+def test_scan_commits_in_batches_so_other_connection_can_write(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from local_media_curator.db.connection import connect
+    from local_media_curator.media import scanner as scanner_mod
+
+    monkeypatch.setattr(scanner_mod, "SCAN_COMMIT_BATCH", 2)
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "src"
+    source.mkdir()
+    for i in range(8):
+        Image.new("RGB", (8, 8)).save(source / f"{i:02d}.jpg", "JPEG")
+    LibraryService(project).add_source_folder(source)
+    started = threading.Event()
+    real_read = scanner_mod._read_fields
+
+    def slow_read(path, ext, stat_result):
+        started.set()
+        time.sleep(0.05)
+        return real_read(path, ext, stat_result)
+
+    monkeypatch.setattr(scanner_mod, "_read_fields", slow_read)
+    errors: list[str] = []
+
+    def writer():
+        started.wait(timeout=5)
+        time.sleep(0.12)
+        other = connect(project.db_path)
+        other.execute("PRAGMA busy_timeout = 0")
+        try:
+            try:
+                other.execute(
+                    "UPDATE media SET rejected = 1 WHERE id = (SELECT id FROM media LIMIT 1)"
+                )
+                other.commit()
+            except sqlite3.OperationalError as exc:
+                errors.append(str(exc))
+        finally:
+            other.close()
+
+    thread = threading.Thread(target=writer)
+    thread.start()
+    LibraryService(project).scan()
+    thread.join(timeout=10)
+    assert errors == []
+    project.close()
+
+
+def test_reject_during_locked_db_shows_status_not_raise(qtbot, tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "src"
+    source.mkdir()
+    Image.new("RGB", (10, 10)).save(source / "A.jpg", "JPEG")
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    window.add_source_folder(source)
+    window.scan()
+    qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 1, timeout=8000)
+    window.media_grid.view.setCurrentIndex(window.media_grid.model.index(0))
+
+    def boom(*_args, **_kwargs):
+        raise sqlite3.OperationalError("database is locked")
+
+    window.undo_stack.reject = boom  # type: ignore[method-assign]
+    window.reject_selection()
+    assert "busy" in window.statusBar().currentMessage().lower()
+    project.close()

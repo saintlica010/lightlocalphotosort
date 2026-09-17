@@ -188,6 +188,14 @@ class MainWindow(QMainWindow):
         self._reload_lists()
         self._reload_grid()
 
+    def _run_curation(self, action: Callable[[], None]) -> bool:
+        try:
+            action()
+            return True
+        except sqlite3.OperationalError:
+            self.statusBar().showMessage("Database is busy. Try again.")
+            return False
+
     def show_library_view(self, name: str) -> None:
         self._view_mode = name
         self._current_list_id = None
@@ -203,7 +211,10 @@ class MainWindow(QMainWindow):
     def add_items_to_list(self, list_id: int, media_ids: list[int]) -> None:
         if self.undo_stack is None or not media_ids:
             return
-        self.undo_stack.add_items(list_id, media_ids)
+        if not self._run_curation(
+            lambda: self.undo_stack.add_items(list_id, media_ids)
+        ):
+            return
         self.refresh()
 
     def add_selection_to_list(self, list_id: int) -> None:
@@ -219,7 +230,12 @@ class MainWindow(QMainWindow):
         media_ids = self.media_grid.selected_ids()
         if not media_ids:
             return
-        self.undo_stack.move_selection(self._current_list_id, media_ids, delta)
+        if not self._run_curation(
+            lambda: self.undo_stack.move_selection(
+                self._current_list_id, media_ids, delta
+            )
+        ):
+            return
         self.refresh()
         self._select_media_ids(media_ids)
 
@@ -250,7 +266,10 @@ class MainWindow(QMainWindow):
         to_select = [
             media_id for media_id in ordered if media_id in previously_selected
         ]
-        self.undo_stack.reorder(self._current_list_id, ordered)
+        if not self._run_curation(
+            lambda: self.undo_stack.reorder(self._current_list_id, ordered)
+        ):
+            return
         self.refresh()
         self._select_media_ids(to_select)
 
@@ -264,7 +283,12 @@ class MainWindow(QMainWindow):
         media_ids = self.media_grid.selected_ids()
         if not media_ids:
             return
-        self.undo_stack.move_to_ends(self._current_list_id, media_ids, end=end)
+        if not self._run_curation(
+            lambda: self.undo_stack.move_to_ends(
+                self._current_list_id, media_ids, end=end
+            )
+        ):
+            return
         self.refresh()
         self._select_media_ids(media_ids)
 
@@ -274,7 +298,10 @@ class MainWindow(QMainWindow):
         media_ids = self.media_grid.selected_ids()
         if not media_ids:
             return
-        self.undo_stack.remove_items(list_id, media_ids)
+        if not self._run_curation(
+            lambda: self.undo_stack.remove_items(list_id, media_ids)
+        ):
+            return
         self.refresh()
 
     def reject_selection(self) -> None:
@@ -283,7 +310,8 @@ class MainWindow(QMainWindow):
         media_ids = self.media_grid.selected_ids()
         if not media_ids:
             return
-        self.undo_stack.reject(media_ids)
+        if not self._run_curation(lambda: self.undo_stack.reject(media_ids)):
+            return
         self.refresh()
 
     def restore_selection(self) -> None:
@@ -292,7 +320,8 @@ class MainWindow(QMainWindow):
         media_ids = self.media_grid.selected_ids()
         if not media_ids:
             return
-        self.undo_stack.restore(media_ids)
+        if not self._run_curation(lambda: self.undo_stack.restore(media_ids)):
+            return
         self.refresh()
 
     def _install_menus(self) -> None:
@@ -471,14 +500,18 @@ class MainWindow(QMainWindow):
         self.preview_panel.open_original()
 
     def _on_undo(self) -> None:
-        if self.undo_stack is not None:
-            self.undo_stack.undo()
-            self.refresh()
+        if self.undo_stack is None:
+            return
+        if not self._run_curation(self.undo_stack.undo):
+            return
+        self.refresh()
 
     def _on_redo(self) -> None:
-        if self.undo_stack is not None:
-            self.undo_stack.redo()
-            self.refresh()
+        if self.undo_stack is None:
+            return
+        if not self._run_curation(self.undo_stack.redo):
+            return
+        self.refresh()
 
     def _on_library_view_changed(self, name: str) -> None:
         self.show_library_view(name)

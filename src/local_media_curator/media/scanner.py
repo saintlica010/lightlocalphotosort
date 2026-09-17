@@ -16,6 +16,7 @@ from local_media_curator.media.metadata import extract_image_metadata
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}
 VIDEO_EXTENSIONS = {".mp4", ".mov"}
 SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
+SCAN_COMMIT_BATCH = 256
 
 
 class ScanCancelled(Exception):
@@ -82,13 +83,13 @@ def scan_source_folder(
     existing_rows = repo.list_under_folder(folder_normalized)
     existing_by_norm = {row["normalized_path"]: row for row in existing_rows}
     seen: set[str] = set()
+    processed = 0
 
     try:
         for path in _iter_media_files(
             folder, recursive, skip_dirs=(project.thumbnails_dir,)
         ):
             if cancel_check is not None and cancel_check():
-                conn.rollback()
                 raise ScanCancelled()
             try:
                 stat_result = path.stat()
@@ -123,32 +124,38 @@ def scan_source_folder(
                     )
                 except sqlite3.IntegrityError:
                     result.unchanged += 1
-                    continue
-                result.added += 1
-                continue
+                else:
+                    result.added += 1
+            else:
+                size_changed = row["file_size"] != stat_result.st_size
+                mtime_changed = row["modified_at"] != modified_at
+                if size_changed or mtime_changed:
+                    media_type, width, height, captured_at = _read_fields(
+                        path, ext, stat_result
+                    )
+                    repo.update_file_metadata(
+                        row["id"],
+                        file_size=stat_result.st_size,
+                        width=width,
+                        height=height,
+                        captured_at=(
+                            captured_at if media_type == "image" else modified_at
+                        ),
+                        modified_at=modified_at,
+                    )
+                    result.modified += 1
+                else:
+                    if row["missing"]:
+                        repo.set_missing(row["id"], False)
+                    result.unchanged += 1
 
-            size_changed = row["file_size"] != stat_result.st_size
-            mtime_changed = row["modified_at"] != modified_at
-            if size_changed or mtime_changed:
-                media_type, width, height, captured_at = _read_fields(
-                    path, ext, stat_result
-                )
-                repo.update_file_metadata(
-                    row["id"],
-                    file_size=stat_result.st_size,
-                    width=width,
-                    height=height,
-                    captured_at=captured_at if media_type == "image" else modified_at,
-                    modified_at=modified_at,
-                )
-                result.modified += 1
-                continue
-
-            if row["missing"]:
-                repo.set_missing(row["id"], False)
-            result.unchanged += 1
+            processed += 1
+            if processed % SCAN_COMMIT_BATCH == 0:
+                conn.commit()
 
         for row in existing_rows:
+            if cancel_check is not None and cancel_check():
+                raise ScanCancelled()
             if row["normalized_path"] in seen:
                 continue
             if not row["missing"]:
@@ -156,6 +163,9 @@ def scan_source_folder(
             result.missing += 1
 
         conn.commit()
+    except ScanCancelled:
+        conn.rollback()
+        raise
     except Exception:
         conn.rollback()
         raise
