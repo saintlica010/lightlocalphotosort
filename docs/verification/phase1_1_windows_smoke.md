@@ -40,7 +40,8 @@ The spec is unchanged: `datas=[]`, `binaries=[]`, one-folder `COLLECT`.
 |---|---|---|
 | Runs | the built `local_media_curator.exe` | the source tree under `src/` |
 | Proves | the frozen bundle actually works end to end | the logic is correct |
-| Status | **NOT YET RUN** (section 4) | passing (section 5) |
+| Status | **done — user-confirmed** (section 4) | passing (section 5) |
+| Evidence | the user's manual pass on the built EXE | machine-captured pytest run |
 
 A passing pytest run is **not** a substitute for the packaged-EXE walkthrough. The
 bundle can fail in ways the source tree cannot: missing hidden imports, a Qt plugin
@@ -86,6 +87,14 @@ was correct but confusing:
    would put `project.sqlite3`, `thumbnails/` and `logs/` inside the real photo tree,
    which `AGENTS.md` §14/§17 forbids. The correct flow is: create the project
    elsewhere, then add the photos folder as a *source folder*.
+4. **`QInputDialog`'s OK / Cancel were still Qt-provided.** Found by review after the
+   first rebuild, not by the user's pass. The QMessageBox fix had set its buttons in
+   code, but "新建名单", "重命名名单" and "添加到名单" still went through
+   `QInputDialog.getText` / `getItem`, which render their own standard buttons. Same
+   root cause, same fix: `ask_text` and `ask_item` in `ui/dialogs.py` set
+   `确定` / `取消` directly. Verified in a frozen bundle:
+   `text dialog: 新建名单 | 名称： | 确定 / 取消`. `tests/test_ui_language.py` covers
+   both dialogs and asserts the panel and picker route through the helpers.
 
 Also found while changing those messages: four `match=` assertions in the test suite
 were passing for the wrong reason. `pytest`'s `tmp_path` embeds the test name, and
@@ -177,7 +186,7 @@ independent reorder, reject/restore, undo/redo, close and reopen, membership + o
 Full suite, `QT_QPA_PLATFORM=offscreen`, Python 3.12.10:
 
 ```text
-149 passed, 1 skipped
+174 passed
 ```
 
 Repeated 6 times with no flake. On Python 3.14.3 this suite segfaults ~5% of runs in

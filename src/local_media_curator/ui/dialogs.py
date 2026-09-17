@@ -37,6 +37,48 @@ def ask_confirm(parent: QWidget | None, title: str, text: str) -> bool:
     return box.exec() == QMessageBox.StandardButton.Yes
 
 
+def ask_text(
+    parent: QWidget | None, title: str, label: str, text: str = ""
+) -> str | None:
+    """Text input with Chinese buttons set by us, not by Qt.
+
+    Same reason as show_warning: `qt_zh_CN` loads from the source tree but not
+    inside the frozen EXE, so a dialog whose title and label are Chinese would
+    still come up with English OK / Cancel buttons.
+    """
+    dialog = QInputDialog(parent)
+    dialog.setWindowTitle(title)
+    dialog.setLabelText(label)
+    dialog.setTextValue(text)
+    dialog.setOkButtonText("确定")
+    dialog.setCancelButtonText("取消")
+    if dialog.exec() != QInputDialog.DialogCode.Accepted:
+        return None
+    return dialog.textValue()
+
+
+def ask_item(
+    parent: QWidget | None,
+    title: str,
+    label: str,
+    items: list[str],
+    current: int = 0,
+) -> str | None:
+    """Item picker with Chinese buttons. See ask_text."""
+    dialog = QInputDialog(parent)
+    dialog.setWindowTitle(title)
+    dialog.setLabelText(label)
+    dialog.setComboBoxItems(items)
+    dialog.setComboBoxEditable(False)
+    if 0 <= current < len(items):
+        dialog.setTextValue(items[current])
+    dialog.setOkButtonText("确定")
+    dialog.setCancelButtonText("取消")
+    if dialog.exec() != QInputDialog.DialogCode.Accepted:
+        return None
+    return dialog.textValue()
+
+
 def choose_existing_directory(parent: QWidget | None, title: str) -> Path | None:
     chosen = QFileDialog.getExistingDirectory(parent, title)
     if not chosen:
@@ -51,8 +93,8 @@ def choose_list_name(
 ) -> str | None:
     if not names:
         return None
-    chosen, ok = QInputDialog.getItem(parent, title, "名单：", names, 0, False)
-    if not ok:
+    chosen = ask_item(parent, title, "名单：", names, 0)
+    if chosen is None:
         return None
     chosen = chosen.strip()
     return chosen or None

@@ -47,7 +47,11 @@ Verification commands:
 QT_QPA_PLATFORM=offscreen "H:/2026shbookfair/.venv/Scripts/python.exe" -m pytest -q
 ```
 
-Current state: **107 passed, 1 skipped.** The one warning is a `PytestCacheWarning` caused by `.pytest_cache` being undeletable on this machine (WinError 5 on an empty directory — a held Windows handle or an odd ACL, not a code issue). Clearing it needs a reboot or closing the lock holder.
+Current state at the time of writing: 107 passed, 1 skipped. **Not current** — see
+`docs/OPENCODE_HANDOFF.md` for the live number. One warning appears about
+`.pytest_cache` being undeletable on this machine (WinError 5 on an empty directory — a
+held Windows handle or an odd ACL, not a code issue); clearing it needs a reboot or
+closing the lock holder.
 
 ---
 

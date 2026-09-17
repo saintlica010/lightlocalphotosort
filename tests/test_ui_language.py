@@ -223,6 +223,103 @@ def test_warning_dialog_button_is_chinese(qtbot, monkeypatch) -> None:
     assert captured["texts"] == ["确定"]
 
 
+def test_text_input_dialog_buttons_are_chinese(qtbot, monkeypatch) -> None:
+    """QInputDialog's own OK/Cancel come from Qt, so we must set them.
+
+    Same class of problem as QMessageBox: the Qt catalogue does not load inside
+    the frozen EXE, so a dialog whose title and label are Chinese would still
+    show English buttons.
+    """
+    from PySide6.QtWidgets import QInputDialog
+
+    from local_media_curator.ui.dialogs import ask_text
+
+    captured: dict[str, object] = {}
+
+    def fake_exec(self) -> int:
+        captured["ok"] = self.okButtonText()
+        captured["cancel"] = self.cancelButtonText()
+        captured["title"] = self.windowTitle()
+        captured["label"] = self.labelText()
+        captured["text"] = self.textValue()
+        return int(QInputDialog.DialogCode.Rejected)
+
+    monkeypatch.setattr(QInputDialog, "exec", fake_exec)
+    assert ask_text(None, "新建名单", "名称：", text="现有名") is None
+    assert captured["ok"] == "确定"
+    assert captured["cancel"] == "取消"
+    assert captured["title"] == "新建名单"
+    assert captured["label"] == "名称："
+    assert captured["text"] == "现有名"
+
+
+def test_text_input_dialog_returns_entered_text(qtbot, monkeypatch) -> None:
+    from PySide6.QtWidgets import QInputDialog
+
+    from local_media_curator.ui.dialogs import ask_text
+
+    def fake_exec(self) -> int:
+        self.setTextValue("  新名单  ")
+        return int(QInputDialog.DialogCode.Accepted)
+
+    monkeypatch.setattr(QInputDialog, "exec", fake_exec)
+    assert ask_text(None, "新建名单", "名称：") == "  新名单  "
+
+
+def test_item_input_dialog_buttons_are_chinese(qtbot, monkeypatch) -> None:
+    from PySide6.QtWidgets import QInputDialog
+
+    from local_media_curator.ui.dialogs import ask_item
+
+    captured: dict[str, object] = {}
+
+    def fake_exec(self) -> int:
+        captured["ok"] = self.okButtonText()
+        captured["cancel"] = self.cancelButtonText()
+        captured["items"] = list(self.comboBoxItems())
+        captured["title"] = self.windowTitle()
+        return int(QInputDialog.DialogCode.Accepted)
+
+    monkeypatch.setattr(QInputDialog, "exec", fake_exec)
+    assert ask_item(None, "添加到名单", "名单：", ["Promotional", "Website"]) == "Promotional"
+    assert captured["ok"] == "确定"
+    assert captured["cancel"] == "取消"
+    assert captured["items"] == ["Promotional", "Website"]
+    assert captured["title"] == "添加到名单"
+
+
+def test_list_panel_uses_the_chinese_input_helpers(qtbot, monkeypatch) -> None:
+    """The panel must route through the helpers, not call Qt directly."""
+    from local_media_curator.ui import list_panel as panel_module
+    from local_media_curator.ui.list_panel import ListPanel
+
+    panel = ListPanel()
+    qtbot.addWidget(panel)
+    seen: list[tuple] = []
+
+    def fake_text(parent, title, label, text=""):
+        seen.append(("text", title, label, text))
+        return "命名"
+
+    monkeypatch.setattr(panel_module, "ask_text", fake_text)
+    panel._on_new()
+    assert seen == [("text", "新建名单", "名称：", "")]
+
+
+def test_choose_list_name_uses_the_chinese_item_helper(monkeypatch) -> None:
+    from local_media_curator.ui import dialogs as dialogs_module
+
+    seen: list[tuple] = []
+
+    def fake_item(parent, title, label, items, current=0):
+        seen.append((title, label, list(items)))
+        return "Website"
+
+    monkeypatch.setattr(dialogs_module, "ask_item", fake_item)
+    assert dialogs_module.choose_list_name(None, ["Promotional", "Website"]) == "Website"
+    assert seen == [("添加到名单", "名单：", ["Promotional", "Website"])]
+
+
 def test_error_messages_shown_to_users_are_chinese(tmp_path: Path) -> None:
     """These strings reach the user through str(exc) in a dialog."""
     from local_media_curator.domain.paths import reject_overlapping_roots

@@ -133,11 +133,25 @@ C1 used to freeze the UI ~19 s at 10k rows (O(N) `stat`/`resolve` on the GUI thr
 | Review section | What | Commit |
 |---|---|---|
 | §2 | disable reorder in filtered lists | `15b5e31` |
-| §1 | all user-facing UI in Simplified Chinese | `3be72a1` |
+| §1 | all user-facing UI in Simplified Chinese | `3be72a1`, `1f19731`, and the input-dialog fix below |
 
 §2 was a real correctness bug, not a polish item: a named list could still be dragged while filters hid some members, so dragging moved the hidden photos too (observed `[1,2,3,4]` → `[1,3,4,2]`). Reorder is now gated on `list_mode and not filters_active()`; the four move actions, drag-drop and the status bar follow one value. No filtered-subset reorder algorithm was added, per the review.
 
-§1 translated every visible string. Note `install_chinese_translations` in `app.py`: Qt's own Yes/No/OK/Cancel come from Qt's catalogue, so the translator must be loaded or those buttons stay English inside a Chinese UI. `tests/test_ui_language.py` asserts representative strings and sweeps all visible text for English UI vocabulary.
+§1 translated every visible string. `tests/test_ui_language.py` asserts representative strings and sweeps all visible text for English UI vocabulary.
+
+**Do not rely on `install_chinese_translations` in `app.py`.** It is kept as a
+best-effort fallback, but it demonstrably fails inside the frozen EXE:
+`QTranslator.load("qt_zh_CN")` returns `True` from the source tree and `False` when
+frozen, with the `.qm` file present and byte-identical. Anything Qt renders itself —
+the standard dialog buttons — must be set in our code:
+
+- `show_warning` / `ask_confirm` — QMessageBox, buttons `确定`, `是` / `否`
+- `ask_text` / `ask_item` — QInputDialog, buttons `确定` / `取消`
+
+`QInputDialog.getText` / `getItem` were missed in the first pass and found only by
+reading the code after the frozen-EXE probe; they render their own buttons. Do not
+introduce a new direct `QMessageBox` or `QInputDialog` call — add a helper. Verify any
+such change inside a frozen bundle, not just in the source tree.
 
 ### Final-review sections 3 and 4
 
@@ -150,7 +164,7 @@ C1 used to freeze the UI ~19 s at 10k rows (O(N) `stat`/`resolve` on the GUI thr
 library holds 1,000 rows or 10,000, and at most ceil(n/400) membership statements. Timing
 thresholds were avoided deliberately — their absence is why C1 shipped.
 
-Current suite: **169 passed** on Python 3.12.
+Current suite: **174 passed** on Python 3.12.
 
 ---
 
@@ -206,7 +220,9 @@ $env:QT_QPA_PLATFORM='offscreen'
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Expected: **127 passed, 1 skipped.** One warning may appear about `.pytest_cache` being undeletable — an environment artifact, not a code issue.
+Expected: **174 passed.** (The count grows as tests are added; read the number from the
+run rather than from this line.) One warning may appear about `.pytest_cache` being
+undeletable — an environment artifact, not a code issue.
 
 If a GUI-scan test hangs: prefer `LibraryService.scan()` plus `window.refresh()` for unit tests; `window.scan()` needs the DirectConnection worker and `qtbot.waitUntil` with a finite timeout. Always set `QT_QPA_PLATFORM=offscreen`.
 

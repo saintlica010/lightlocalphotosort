@@ -5,7 +5,6 @@ from collections.abc import Mapping, Sequence
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -13,6 +12,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from local_media_curator.ui.dialogs import ask_text
 
 
 class ListPanel(QWidget):
@@ -64,8 +65,8 @@ class ListPanel(QWidget):
         return int(value) if value is not None else None
 
     def _on_new(self) -> None:
-        name, ok = QInputDialog.getText(self, "新建名单", "名称：")
-        if ok and name.strip():
+        name = ask_text(self, "新建名单", "名称：")
+        if name and name.strip():
             self.create_requested.emit(name.strip())
 
     def _on_rename(self) -> None:
@@ -74,8 +75,8 @@ class ListPanel(QWidget):
             return
         item = self.lists_widget.currentItem()
         current = item.text() if item is not None else ""
-        name, ok = QInputDialog.getText(self, "重命名名单", "名称：", text=current)
-        if ok and name.strip():
+        name = ask_text(self, "重命名名单", "名称：", text=current)
+        if name and name.strip():
             self.rename_requested.emit(list_id, name.strip())
 
     def _on_delete(self) -> None:
