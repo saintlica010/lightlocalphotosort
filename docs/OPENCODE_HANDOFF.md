@@ -128,15 +128,26 @@ Scan used to run on the GUI thread despite `moveToThread`, because a receiverles
 
 C1 used to freeze the UI ~19 s at 10k rows (O(N) `stat`/`resolve` on the GUI thread). Reload now uses `self._thumb_paths`, filled by `_on_thumbnail_ready`; after a scan it is cleared so workers re-`ensure()` (the disk cache still wins for unchanged files).
 
-Current suite: **127 passed, 1 skipped** on Python 3.12.
+### Final-review sections 1 and 2 (done)
+
+| Review section | What | Commit |
+|---|---|---|
+| §2 | disable reorder in filtered lists | `15b5e31` |
+| §1 | all user-facing UI in Simplified Chinese | `3be72a1` |
+
+§2 was a real correctness bug, not a polish item: a named list could still be dragged while filters hid some members, so dragging moved the hidden photos too (observed `[1,2,3,4]` → `[1,3,4,2]`). Reorder is now gated on `list_mode and not filters_active()`; the four move actions, drag-drop and the status bar follow one value. No filtered-subset reorder algorithm was added, per the review.
+
+§1 translated every visible string. Note `install_chinese_translations` in `app.py`: Qt's own Yes/No/OK/Cancel come from Qt's catalogue, so the translator must be loaded or those buttons stay English inside a Chinese UI. `tests/test_ui_language.py` asserts representative strings and sweeps all visible text for English UI vocabulary.
+
+Current suite: **149 passed, 1 skipped** on Python 3.12.
 
 ---
 
 ## 6. What to do next
 
-**All of section 1–4 of `docs/PHASE1_1_FINAL_REVIEW.md`.** That document carries the full requirements, the translation table, and the acceptance gate. Summary of order and why:
+**Sections 3 and 4 of `docs/PHASE1_1_FINAL_REVIEW.md` remain.** Sections 1 and 2 are done — see section 5 above. The subsections below are kept for their detail; 6.1 and 6.2 are complete.
 
-### 6.1 Section 2 — disable reorder while a named list is filtered (MERGE BLOCKER, do this first)
+### 6.1 Section 2 — disable reorder while a named list is filtered — **DONE (`15b5e31`)**
 
 A named list can still be dragged/reordered while display filters hide some of its members. Dragging then submits only the visible subset to the full-list reorder path, so **hidden photos move implicitly**. `AGENTS.md` §20 forbids a temporary filter from rewriting manual order.
 
@@ -144,7 +155,7 @@ Confirmed current state: reorder enablement is gated on `list_mode` only — `ui
 
 Required: filter active → drag reorder and all four move actions disabled, status shows `名单（已筛选，排序已禁用）`; clearing filters restores them. **Do not build a filtered-subset reorder algorithm** — the review says explicitly not to.
 
-### 6.2 Section 1 — all user-facing UI in Simplified Chinese
+### 6.2 Section 1 — all user-facing UI in Simplified Chinese — **DONE (`3be72a1`)**
 
 Every menu, action, button, label, dialog, warning, status message, view name, filter option, tooltip and empty state. The review carries a full translation table. **Do not translate** filenames, paths, user-created list names, metadata values, or extension strings such as `.jpg`. Source identifiers, tests and developer docs stay English.
 
