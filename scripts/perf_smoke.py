@@ -122,11 +122,97 @@ def run(count: int) -> None:
             project.close()
 
 
+def run_gui(count: int) -> None:
+    """Same sizes, but through the real MainWindow / model / view.
+
+    Offscreen so it runs headless. Anything that needs a display would make
+    this unreproducible on a build agent.
+    """
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from local_media_curator.app import create_app
+    from local_media_curator.ui.main_window import MainWindow
+
+    app = create_app()
+    print(f"\n=== {count:,} rows through MainWindow (offscreen) ===")
+    with tempfile.TemporaryDirectory() as tmp:
+        project = create_project(Path(tmp) / "proj")
+        try:
+            ids = insert_media(project, count)
+            window = MainWindow()
+            window.resize(1400, 900)
+
+            (_, reload_s) = timed(
+                "set_project (grid reload)", lambda: window.set_project(project)
+            )
+            assert window.media_grid.model.rowCount() == count
+
+            # The metric that matters: reload must not touch the filesystem once
+            # per row. C1 was exactly that, and it froze the UI for ~19 s at 10k.
+            fs_calls = {"n": 0}
+            real_stat, real_is_file = os.stat, Path.is_file
+
+            def counting_stat(*a, **k):
+                fs_calls["n"] += 1
+                return real_stat(*a, **k)
+
+            def counting_is_file(self):
+                fs_calls["n"] += 1
+                return real_is_file(self)
+
+            os.stat = counting_stat
+            Path.is_file = counting_is_file
+            try:
+                window.refresh()
+            finally:
+                os.stat = real_stat
+                Path.is_file = real_is_file
+            print(f"{'filesystem calls / reload':<28} {fs_calls['n']:8d} (rows={count:,})")
+
+            (_, filter_s) = timed(
+                "filter change",
+                lambda: window.library_panel.type_combo.setCurrentIndex(1),
+            )
+            window.library_panel.type_combo.setCurrentIndex(0)
+            (_, sort_s) = timed(
+                "sort change",
+                lambda: window.library_panel.sort_combo.setCurrentIndex(1),
+            )
+            window.library_panel.sort_combo.setCurrentIndex(0)
+
+            list_id = ListService(project).create("Perf")
+            ListService(project).add_items(list_id, ids[:200])
+            (_, named_s) = timed("named-list display", lambda: window.show_list(list_id))
+
+            scrollbar = window.media_grid.view.verticalScrollBar()
+            (_, scroll_s) = timed(
+                "12 viewport scroll steps",
+                lambda: [
+                    (
+                        scrollbar.setValue(scrollbar.maximum() * i // 12),
+                        window.media_grid.view.viewport().repaint(),
+                        app.processEvents(),
+                    )
+                    for i in range(13)
+                ],
+            )
+            pool = window.thumbnail_pool
+            pending, inflight = len(pool.pending_ids()), len(pool.inflight_ids())
+            print(f"{'thumbnail pending/inflight':<28} {pending:8d} / {inflight} ")
+            assert pending + inflight <= MAX_PENDING + 8, "thumbnail queue grew unbounded"
+
+            window.close()
+        finally:
+            project.close()
+
+
 def main() -> None:
     print(f"Python {platform.python_version()} on {platform.system()}")
     print(f"MAX_PENDING={MAX_PENDING} PIXMAP_CACHE_LIMIT={PIXMAP_CACHE_LIMIT}")
     run(1_000)
     run(10_000)
+    run_gui(1_000)
+    run_gui(10_000)
 
 
 if __name__ == "__main__":
