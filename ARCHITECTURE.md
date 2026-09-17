@@ -42,17 +42,30 @@ Implemented as a `QMainWindow` with a horizontal `QSplitter`. Library views are 
 
 ## Scanning
 
-`LibraryService.scan()` stays synchronous for tests. The GUI starts `ScanWorker` on a `QThread`. The worker opens its own connection via `open_project`, scans enabled source folders, and emits `finished` or `failed`.
+`LibraryService.scan()` stays synchronous for tests. The GUI starts `ScanWorker` on a `QThread`. The worker opens its own connection via `open_project`, scans enabled source folders, and emits `finished`, `failed`, `cancelled`, or `progress`.
+
+- `thread.started` uses `Qt.ConnectionType.DirectConnection` so `run()` executes on the worker thread; a receiverless lambda would otherwise queue onto the GUI thread.
+- Cancellation is cooperative: `ScanWorker.cancel()` sets a `threading.Event`; `scan_source_folder` checks it before each file, rolls back the in-progress folder transaction, and raises `ScanCancelled`. `MainWindow._stop_scan_thread` cancels, quits, and waits up to 30 s; it never calls `QThread.terminate()` and never drops a still-running thread.
+- Progress is throttled: `scan_source_folder` counts processed files (including unchanged rows) and reports the first file, every `PROGRESS_EVERY = 25`, and the folder total. `LibraryService.scan` accumulates a cumulative count across folders; `ScanWorker.progress = Signal(int)` reaches the GUI through a queued connection and sets status `Scanning... {n:,} files processed`. Stale worker signals are dropped after thread stop; finished/cancelled/failed restore the `Library (sorted)` / `List (manual order)` status.
+- Scan work commits in `SCAN_COMMIT_BATCH = 256` batches so concurrent GUI writes are not dropped (`SQLITE_BUSY`).
+
+`LibraryService.add_source_folder` rejects project/source overlap generically via `paths_overlap` / `reject_overlapping_roots` (normalized, case-insensitive on Windows): project inside source, source inside project, or equal roots raise `ValueError`; `MainWindow` catches it and shows a warning dialog.
 
 Scans are read-only against source media: enumerate, stat, and open for metadata. They do not rewrite, rename, move, chmod, delete, or write sidecars or caches next to originals.
 
 Supported images: `.jpg`, `.jpeg`, `.png`, `.webp`, `.tif`, `.tiff`. Videos `.mp4` and `.mov` are recognized with reduced functionality.
 
+## Filters
+
+`LibraryPanel` hosts four compact combos (type, extension, source folder, missing/present). `MediaRepository.list_media` / `list_unassigned` accept `source_folder` (exact `normalized_path` prefix match, no `LIKE` wildcards) and `missing: bool | None`. The named-list view filters ordered media in memory via `LibraryService.filter_media`, preserving input order, and never writes `sort_key`. All/Unassigned/Rejected views push the same filters into SQL.
+
 ## Thumbnails
 
 `ThumbnailService` writes WebP files under `project.thumbnails_dir`. The cache key includes media id, source mtime, size, profile, and version.
 
-`ThumbnailPool` wraps `QThreadPool` (4 workers). The grid shows placeholders first; `request()` then fills visible rows. Newer visible jobs outrank a large backlog. Corrupt or unreadable sources yield an error placeholder rather than crashing a worker.
+`ThumbnailPool` wraps `QThreadPool` (4 workers). Only in-flight jobs live on the pool; a lock-guarded bounded pending queue (`MAX_PENDING = 64`) is rebuilt by `sync(needed, visible_ids)`, which prioritizes currently visible rows and promotes newly visible ids over backlog. `MediaGrid.visible_row_range()` samples the viewport plus `PREFETCH_ROWS` rows and emits a debounced `viewportRowsChanged`; `MainWindow` stores `_thumb_needed` from reload and calls `_sync_thumbnails()` instead of enqueuing whole libraries. After a scan, `_thumb_paths` is cleared so workers re-`ensure()` (unchanged files still hit the disk cache). The grid shows placeholders first. `ThumbnailDelegate` paints only disk-cache WebP paths through a bounded LRU `BoundedPixmapCache` (`PIXMAP_CACHE_LIMIT = 256`); it never opens source images. Corrupt or unreadable sources yield an error placeholder rather than crashing a worker.
+
+Grid reload is bulk: `_reload_grid` fetches list membership with `list_names_for_media_ids` (chunked `IN` queries, 400 ids per chunk) instead of one query per row, and does no filesystem work on the GUI thread.
 
 ## Lists
 

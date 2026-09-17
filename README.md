@@ -24,9 +24,9 @@ python -m pip install -e ".[dev]"
 python -m local_media_curator
 ```
 
-1. **New Project** or **Open Project** — choose a folder that is not inside `photos/`, `phototakeplan/`, or `lightphotosprt/`.
-2. **Add Source Folder**, then **Scan** (F5). Source files are never moved, renamed, or rewritten.
-3. Browse All / Unassigned / Rejected, or create named virtual lists.
+1. **New Project** or **Open Project** — choose a folder that is not inside `photos/`, `phototakeplan/`, or `lightphotosprt/`. A source folder that would overlap the project folder is rejected with a warning.
+2. **Add Source Folder**, then **Scan** (F5). The status bar shows `Scanning... {n:,} files processed` while working. Source files are never moved, renamed, or rewritten.
+3. Browse All / Unassigned / Rejected, or create named virtual lists. Filter the grid with the four combos (type, extension, source folder, missing/present); filtering never rewrites a list's manual order.
 4. **Add to List** (from All Media, pick a list), reject/restore, reorder a named list with `[` / `]` or Ctrl+Up/Down, and undo.
 
 ## Packaged Windows build
