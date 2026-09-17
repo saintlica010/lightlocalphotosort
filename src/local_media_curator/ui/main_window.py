@@ -135,6 +135,9 @@ class MainWindow(QMainWindow):
 
     def _on_scan_finished(self, _result: object) -> None:
         self._stop_scan_thread()
+        # Drop cached thumb paths so workers re-ensure() after scan may have
+        # refreshed source mtime/size; disk cache still hits off the GUI thread.
+        self._thumb_paths.clear()
         self.refresh()
 
     def _on_scan_cancelled(self) -> None:
@@ -145,6 +148,7 @@ class MainWindow(QMainWindow):
             # window may not own any more.
             return
         self._stop_scan_thread()
+        self._thumb_paths.clear()
         self.refresh()
 
     def _on_scan_failed(self, message: str) -> None:

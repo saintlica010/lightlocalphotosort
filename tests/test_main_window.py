@@ -67,3 +67,29 @@ def test_library_refresh_keeps_selection(qtbot, tmp_path: Path) -> None:
     assert current.isValid()
     assert int(window.media_grid.model.data(current, MediaListModel.IdRole)) == media_id
     project.close()
+
+
+def test_scan_finished_invalidates_thumb_paths_for_reensure(
+    qtbot, tmp_path: Path
+) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "src"
+    source.mkdir()
+    Image.new("RGB", (10, 10)).save(source / "A.jpg", "JPEG")
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    window.add_source_folder(source)
+    window.scan()
+    qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 1, timeout=8000)
+    media_id = int(window.media_grid.model.row_at(0)["id"])
+    window._thumb_paths[media_id] = str(tmp_path / "stale.webp")
+    items = window._media_for_current_view()
+    skipped = {job_id for job_id, _path in window._thumbnail_jobs(items, [])}
+    assert media_id not in skipped
+    window._on_scan_finished(None)
+    items = window._media_for_current_view()
+    requested = {job_id for job_id, _path in window._thumbnail_jobs(items, [])}
+    assert media_id in requested
+    assert media_id not in window._thumb_paths
+    project.close()
