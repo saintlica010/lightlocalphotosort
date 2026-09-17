@@ -4,7 +4,7 @@ Status: **`feat/phase1-mvp` is pushed with known open defects. This document is 
 
 Written: 2026-09-17
 Branch: `feat/phase1-mvp`
-Head at handoff: `4dc8a17`
+Head at handoff: `7383af3` (code complete through Task 5 at `4dc8a17`; this file plus triage landed in `4731062` and `7383af3`)
 Governing spec: `AGENTS.md` (read it first — it is the authority)
 Source review: `docs/PHASE1_1_REVIEW_FIXES.md`
 Implementation plan: `docs/superpowers/plans/2026-09-16-phase1-1-review-fixes.md`

@@ -6,11 +6,28 @@
 
 **Architecture:** Keep the existing PySide6 / sqlite3 / project-local cache layout. Fix grid reload (bulk list membership), thumbnail scheduling (viewport + bounded pending), decoded pixmap cache (LRU), preview (latest-only slot), scan (cooperative cancel + throttled progress), generic project/source path separation, and compact filter UI. Record sanitized Windows smoke and 1k/10k performance evidence.
 
-**Tech Stack:** Python 3.12+, PySide6, stdlib sqlite3, Pillow, pytest/pytest-qt, PyInstaller one-folder.
+**Tech Stack:** Python 3.12 or 3.13, PySide6, stdlib sqlite3, Pillow, pytest/pytest-qt, PyInstaller one-folder.
+
+## Status as of `7383af3` (do not start at Task 1)
+
+Tasks **1–5 are done** on `feat/phase1-mvp` (see commits `4b76373`, `84cf980`, `fc73670`, `b81d984`, `e39bcb3`, `4dc8a17`). Their steps are marked complete below. Do not re-implement them.
+
+**Do not continue this plan linearly at Task 6.** A whole-branch review after Task 5 found defects the original sequence would miss. The live work queue is `docs/PHASE1_1_REMAINING_FIXES.md` §5:
+
+1. **C1** — `_reload_grid` does O(N) filesystem work on the GUI thread (`_thumbnail_path` / `cached_path`). Verify with a filesystem-call-count test, not a timing assertion. Arm the `ThumbnailDelegate` paint invariant (M10) first.
+2. **I1** — batch-commit the scan so GUI writes during scan are not dropped (`SQLITE_BUSY`).
+3. **I2** — restore selection/preview after non-reorder refresh.
+4. **I3 / Task 7** — generic project/source overlap guard (still an `AGENTS.md` safety gap).
+5. **Tasks 6 and 8** — scan progress and filter UI (specs below remain valid).
+6. **I4** — refresh `ARCHITECTURE.md` (and README if needed) after C1, not before.
+7. **Tasks 9 and 10** — 1k/10k perf evidence and Windows smoke. **Do not run these until C1 is fixed**, or the reports will record GUI freezes as baseline.
+8. Remaining minors in the handoff, except items it explicitly drops.
+
+Use Python **3.12 or 3.13** (`AGENTS.md` §12). Do not use Python 3.14: it has been measured to segfault ~5% of full-suite runs in Pillow WebP save on a `QThreadPool` worker. That is a toolchain defect, not an app bug.
 
 ## Global Constraints
 
-- Work only in the existing git worktree `C:\downloadbook\2026shbookfair\.worktrees\feat-phase1-mvp` on branch `feat/phase1-mvp`. Do not merge to `main`.
+- Work on branch `feat/phase1-mvp` in the existing isolated worktree for this clone. Do not merge to `main`. Do not hard-code another machine's worktree path.
 - Do not redesign the app. Do not introduce Electron, a web UI, SQLAlchemy, cloud/network/telemetry, or Phase 2 features (video thumbs, playback, export, HEIC, installer).
 - Protected local trees `photos/`, `phototakeplan/`, and `lightphotosprt/` are read-only reference data. Never modify, rename, move, delete, rewrite EXIF/XMP, create sidecars, or write project DB/cache/log/test output inside them. Never commit or upload them.
 - Automated tests must use generated files under pytest `tmp_path` only. Do not read or write real `photos/` contents in tests.
@@ -60,7 +77,7 @@
 - Consumes: existing `ListRepository.list_names_for_media(media_id: int) -> list[str]`
 - Produces: `ListRepository.list_names_for_media_ids(media_ids: list[int]) -> dict[int, list[str]]`; `ListService.list_names_for_media_ids(media_ids: list[int]) -> dict[int, list[str]]`; `_IN_CHUNK = 400`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/test_lists.py`:
 
@@ -123,13 +140,13 @@ def test_grid_reload_does_not_issue_per_item_list_name_queries(
     project.close()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/test_lists.py::test_list_names_for_media_ids_bulk tests/test_library_query.py::test_grid_reload_does_not_issue_per_item_list_name_queries -v`
 
 Expected: FAIL with `AttributeError: list_names_for_media_ids` and/or too many membership queries (current `_row_from_media` calls `list_names_for_media` per row).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `ListRepository` add `_IN_CHUNK = 400` and:
 
@@ -182,13 +199,13 @@ rows = [
 
 Change `_row_from_media` to take `lists: list[str]` instead of querying.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_lists.py tests/test_library_query.py tests/test_main_window.py -v`
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```text
 git add src/local_media_curator/db/repositories.py src/local_media_curator/services/list_service.py src/local_media_curator/ui/main_window.py tests/test_lists.py tests/test_library_query.py
@@ -211,7 +228,7 @@ git commit -m "perf(grid): bulk-load list memberships"
 - Consumes: existing `ThumbnailPool.request`, `ThumbnailService.ensure`, `MainWindow._thumbnail_jobs`
 - Produces: `MAX_PENDING = 64`; `PREFETCH_ROWS = 24`; `prioritize_jobs(needed: dict[int, str], visible_ids: Sequence[int], inflight: set[int], max_pending: int = MAX_PENDING) -> list[tuple[int, str]]`; `ThumbnailPool.sync(needed: dict[int, str], visible_ids: Sequence[int]) -> None`; `ThumbnailPool.pending_ids() -> list[int]`; `ThumbnailPool.inflight_ids() -> set[int]`; `MediaGrid.viewportRowsChanged = Signal(int, int)`; `MediaGrid.visible_row_range(prefetch: int = PREFETCH_ROWS) -> tuple[int, int]`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/test_thumbnail_schedule.py`:
 
@@ -269,13 +286,13 @@ def test_pool_sync_bounds_pending_and_promotes_visible(qtbot, tmp_path: Path) ->
 
 Keep existing `request()` tests working: `request(jobs)` should call `sync({id: path for id, path in jobs}, visible_ids=[id for id, _ in jobs])`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/test_thumbnail_schedule.py tests/test_thumbnail_pool.py::test_pool_sync_bounds_pending_and_promotes_visible -v`
 
 Expected: FAIL (module/attribute missing).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `thumbnail_schedule.py`:
 
@@ -326,13 +343,13 @@ Change `ThumbnailPool` so QThreadPool only holds in-flight jobs (`<= MAX_WORKERS
 
 Do not enqueue 10k jobs into `QThreadPool`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_thumbnail_schedule.py tests/test_thumbnail_pool.py tests/test_main_window.py -v`
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```text
 git add src/local_media_curator/media/thumbnail_schedule.py src/local_media_curator/media/thumbnail_pool.py src/local_media_curator/ui/media_grid.py src/local_media_curator/ui/main_window.py tests/test_thumbnail_schedule.py tests/test_thumbnail_pool.py
@@ -352,7 +369,7 @@ git commit -m "perf(thumbs): schedule thumbnails from viewport"
 - Consumes: `ThumbnailDelegate._pixmap_for`
 - Produces: `PIXMAP_CACHE_LIMIT = 256`; `BoundedPixmapCache(max_items: int)` with `get(key) -> QPixmap | None`, `put(key, pixmap)`, `len()`, `keys()`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 from PySide6.QtGui import QPixmap
@@ -391,23 +408,23 @@ def test_default_limit_is_bounded() -> None:
     assert cache.get("299") is not None
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_pixmap_cache.py -v`
 
 Expected: FAIL (import error).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `BoundedPixmapCache` uses `collections.OrderedDict`. `get` moves the key to the end. `put` inserts/updates and `popitem(last=False)` while `len > max_items`. `ThumbnailDelegate` stores `self._pixmaps = BoundedPixmapCache()` instead of a dict. Keep disk WebP loading in `_pixmap_for`; do not decode source images in `paint()`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_pixmap_cache.py tests/test_thumbnail_pool.py -v`
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```text
 git add src/local_media_curator/ui/pixmap_cache.py src/local_media_curator/ui/thumbnail_delegate.py tests/test_pixmap_cache.py
@@ -426,7 +443,7 @@ git commit -m "perf(thumbs): bound decoded pixmap cache"
 - Consumes: existing `PreviewLoader.load(path, token, max_edge)` and token filtering in `PreviewPanel`
 - Produces: a single pending slot; at most one queued-not-started job besides the in-flight decode; obsolete B/C must not fully decode when A→B→C→D is requested rapidly
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `tests/test_preview_loader.py`:
 
@@ -482,13 +499,13 @@ def test_rapid_loads_skip_obsolete_queued_work(qtbot, tmp_path: Path, monkeypatc
 
 Retain `test_preview_loader_emits_downsampled_image` (token validation still required).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_preview_loader.py::test_rapid_loads_skip_obsolete_queued_work -v`
 
 Expected: FAIL because B and C are fully decoded (current code starts a QRunnable per `load()`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Replace per-call `QThreadPool.start` with:
 
@@ -500,13 +517,13 @@ Replace per-call `QThreadPool.start` with:
 
 Keep `QThreadPool` max thread count at 1. Do not decode on the GUI thread. Keep token checks in `PreviewPanel._on_preview_loaded`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_preview_loader.py tests/test_preview.py -v`
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```text
 git add src/local_media_curator/media/preview_loader.py tests/test_preview_loader.py
@@ -528,7 +545,7 @@ git commit -m "perf(preview): prefer latest preview request"
 - Consumes: `LibraryService.scan()`, `ScanWorker.run(db_path)`, `MainWindow._stop_scan_thread`
 - Produces: `class ScanCancelled(Exception)` in `scanner.py`; `scan_source_folder(..., cancel_check: Callable[[], bool] | None = None)`; `LibraryService.scan(cancel_check=None)`; `ScanWorker.cancel()`; `ScanWorker.cancelled = Signal()`; `_stop_scan_thread` requests cancel and waits until the QThread is actually finished (timeout 30s). No `QThread.terminate()`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/test_scan_worker.py`:
 
@@ -615,13 +632,13 @@ def test_set_project_cancels_running_scan_thread(qtbot, tmp_path: Path, monkeypa
 
 On cancel, `scan_source_folder` must `rollback()` the in-progress folder transaction so the DB is not left mid-statement. Previously completed folders (already committed) may remain. Source files must still exist unchanged.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/test_scan_worker.py::test_cancel_stops_slow_scan_and_thread tests/test_scan_worker.py::test_set_project_cancels_running_scan_thread -v`
 
 Expected: FAIL or hang until timeout — current `_stop_scan_thread` calls `quit()`/`wait(2000)` and drops refs while the synchronous scan is still running; scanner has no cancel check.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```python
 class ScanCancelled(Exception):
@@ -638,13 +655,13 @@ if cancel_check is not None and cancel_check():
 
 `LibraryService.scan(cancel_check=None)` passes it through. `ScanWorker` holds `threading.Event`; `cancel()` sets it; `run()` uses `cancel_check=self._cancel.is_set`. Catch `ScanCancelled` and emit `cancelled` (not `failed`). `MainWindow._stop_scan_thread` calls `worker.cancel()` then `thread.quit(); thread.wait(30000)`. If still running, **do not** drop refs or `deleteLater`. Never call `QThread.terminate()`. Connect `cancelled` to the same UI cleanup as `finished` (stop thread, refresh).
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_scan_worker.py tests/test_scan_immutability.py -v`
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```text
 git add src/local_media_curator/media/scanner.py src/local_media_curator/services/library_service.py src/local_media_curator/media/scan_worker.py src/local_media_curator/ui/main_window.py tests/test_scan_worker.py
