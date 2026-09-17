@@ -66,7 +66,7 @@ def test_preview_panel_displays_metadata(qtbot, tmp_path: Path) -> None:
     assert panel.captured_at_label.text() == "2024-01-02T03:04:05"
     assert panel.modified_at_label.text() == "2024-01-02T03:04:06"
     assert panel.lists_label.text() == ""
-    assert panel.rejected_label.text() == "否"
+    assert panel.culling_state_label.text() == "未决定"
     assert not panel.image_view.image().isNull()
 
 

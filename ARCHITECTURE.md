@@ -38,7 +38,7 @@ Three-panel shell:
 +----------------+--------------------------------+------------------+
 ```
 
-Implemented as a `QMainWindow` with a horizontal `QSplitter`. Library views are All, Unassigned, and Rejected, plus named virtual lists. The status tip shows `Library (sorted)` versus `List (manual order)`.
+Implemented as a `QMainWindow` with a horizontal `QSplitter`. Library views are All, Unassigned, Picked, Undecided, and Rejected, plus named virtual lists. Live counters summarize the three culling states. The status tip shows `Library (sorted)` versus `List (manual order)`.
 
 ## Scanning
 
@@ -73,9 +73,24 @@ A media item may belong to multiple lists. Independent order lives on `list_item
 
 The grid enables drag while a named list is active. `MediaListModel.dropMimeData` emits `orderChanged`; `MainWindow` persists through `CurationUndoStack.reorder`. Library automatic sorts never rewrite `sort_key`.
 
+The active Target List is a project preference stored in the lightweight
+`project_settings` key/value table under `target_list_id`. Target membership
+uses the same `list_items` relationship and the same `CurationUndoStack` as
+any other named list, so adding or removing target members never changes
+another list's order. Deleting a list clears a matching target preference in
+the same database transaction.
+
+Keyboard curation actions are visible in the Edit menu: `P`/`X`/`U` set
+culling state, `Shift+P`/`Shift+X`/`Shift+U` set state and advance to the next
+visible row, `B` applies the target-list all-or-toggle selection rule, and
+`Shift+B` adds without toggling and advances. Advance snapshots the current
+view order before refresh and restores only the next still-visible media ID.
+Text-editor and editable combo-box focus suppresses all single-letter curation
+actions.
+
 ## Undo
 
-`CurationUndoStack` wraps Qt's undo stack. Undoable actions: add to list, remove from list, reorder, reject, restore. Undo changes project database state only. It never rewrites source media bytes or metadata.
+`CurationUndoStack` wraps Qt's undo stack. Undoable actions: add to list, remove from list, reorder, and single/bulk culling-state changes. A bulk state change is one undo command, and restoring mixed prior states is transactional. Undo changes project database state only. It never rewrites source media bytes or metadata.
 
 ## Packaging
 

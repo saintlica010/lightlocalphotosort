@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime
 
-from local_media_curator.db.repositories import ListRepository
+from local_media_curator.db.repositories import ListRepository, ProjectSettingsRepository
 from local_media_curator.domain.models import Project
 from local_media_curator.domain.ordering import (
     SORT_KEY_GAP,
@@ -68,6 +68,37 @@ class ListService:
     def __init__(self, project: Project) -> None:
         self._project = project
         self._lists = ListRepository(project.connection)
+        self._settings = ProjectSettingsRepository(project.connection)
+
+    def target_list_id(self) -> int | None:
+        value = self._settings.get("target_list_id")
+        if value is None:
+            return None
+        try:
+            list_id = int(value)
+        except ValueError:
+            self.clear_target_list()
+            return None
+        if not any(int(row["id"]) == list_id for row in self._lists.list_all()):
+            self.clear_target_list()
+            return None
+        return list_id
+
+    def get_target_list_id(self) -> int | None:
+        return self.target_list_id()
+
+    def set_target_list(self, list_id: int) -> None:
+        if not any(int(row["id"]) == list_id for row in self._lists.list_all()):
+            raise ValueError("目标名单不存在。")
+        self._settings.set("target_list_id", str(list_id))
+        self._project.connection.commit()
+
+    def set_target_list_id(self, list_id: int) -> None:
+        self.set_target_list(list_id)
+
+    def clear_target_list(self) -> None:
+        self._settings.delete("target_list_id")
+        self._project.connection.commit()
 
     def all_lists(self) -> list[dict[str, object]]:
         return [

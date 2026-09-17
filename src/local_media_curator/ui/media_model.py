@@ -20,6 +20,7 @@ class MediaListModel(QAbstractListModel):
     OrdinalRole = Qt.ItemDataRole.UserRole + 3
     RejectedRole = Qt.ItemDataRole.UserRole + 4
     ThumbnailPathRole = Qt.ItemDataRole.UserRole + 5
+    CullingStateRole = Qt.ItemDataRole.UserRole + 6
     orderChanged = Signal(list, list)
 
     def __init__(
@@ -48,8 +49,13 @@ class MediaListModel(QAbstractListModel):
             return row.get("id")
         if role == self.OrdinalRole:
             return row.get("ordinal")
+        state = row.get("culling_state")
+        if state is None:
+            state = "rejected" if row.get("rejected", False) else "undecided"
         if role == self.RejectedRole:
-            return bool(row.get("rejected", False))
+            return state == "rejected"
+        if role == self.CullingStateRole:
+            return state
         if role == self.ThumbnailPathRole:
             path = row.get("thumbnail_path")
             return str(path) if path else None
@@ -61,6 +67,7 @@ class MediaListModel(QAbstractListModel):
         names[self.FileNameRole] = b"file_name"
         names[self.OrdinalRole] = b"ordinal"
         names[self.RejectedRole] = b"rejected"
+        names[self.CullingStateRole] = b"culling_state"
         return names
 
     def row_at(self, row: int) -> dict[str, object] | None:

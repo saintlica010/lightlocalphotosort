@@ -20,6 +20,10 @@ def ordinal_label(value: object) -> str | None:
     return f"{number:02d}"
 
 
+def culling_marker(value: object) -> str | None:
+    return {"picked": "✓", "rejected": "×"}.get(str(value))
+
+
 class ThumbnailDelegate(QStyledItemDelegate):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -61,6 +65,24 @@ class ThumbnailDelegate(QStyledItemDelegate):
             painter.fillRect(badge, QColor(0, 0, 0, 160))
             painter.setPen(QColor("#ffffff"))
             painter.drawText(badge, int(Qt.AlignmentFlag.AlignCenter), label)
+
+        state = index.data(MediaListModel.CullingStateRole)
+        marker = culling_marker(state)
+        if marker:
+            marker_rect = QRect(
+                thumb_rect.right() - 28,
+                thumb_rect.top() + 4,
+                24,
+                24,
+            )
+            painter.setBrush(QColor(0, 0, 0, 180))
+            painter.setPen(QColor("#ffffff"))
+            painter.drawEllipse(marker_rect)
+            painter.drawText(
+                marker_rect,
+                int(Qt.AlignmentFlag.AlignCenter),
+                marker,
+            )
 
         name = index.data(MediaListModel.FileNameRole)
         if name:

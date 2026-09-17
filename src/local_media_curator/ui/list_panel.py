@@ -21,6 +21,7 @@ class ListPanel(QWidget):
     rename_requested = Signal(int, str)
     delete_requested = Signal(int)
     current_list_changed = Signal(object)
+    set_target_requested = Signal(int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -28,9 +29,11 @@ class ListPanel(QWidget):
         self.new_button = QPushButton("新建")
         self.rename_button = QPushButton("重命名")
         self.delete_button = QPushButton("删除")
+        self.set_target_button = QPushButton("设为目标名单")
         self.new_button.clicked.connect(self._on_new)
         self.rename_button.clicked.connect(self._on_rename)
         self.delete_button.clicked.connect(self._on_delete)
+        self.set_target_button.clicked.connect(self._on_set_target)
         self.lists_widget.currentItemChanged.connect(self._on_current_changed)
         self.lists_widget.itemClicked.connect(self._on_item_clicked)
 
@@ -41,8 +44,18 @@ class ListPanel(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("名单"))
+        self.target_label = QLabel("目标名单：未设置")
+        self.target_label.setObjectName("targetListLabel")
+        layout.addWidget(self.target_label)
         layout.addWidget(self.lists_widget, stretch=1)
         layout.addLayout(buttons)
+        layout.addWidget(self.set_target_button)
+
+    def set_target_list(self, name: str | None) -> None:
+        if name:
+            self.target_label.setText(f"目标名单：★ {name}")
+        else:
+            self.target_label.setText("目标名单：未设置")
 
     def set_lists(self, rows: Sequence[Mapping[str, object]]) -> None:
         current_id = self.selected_list_id()
@@ -84,6 +97,11 @@ class ListPanel(QWidget):
         if list_id is None:
             return
         self.delete_requested.emit(list_id)
+
+    def _on_set_target(self) -> None:
+        list_id = self.selected_list_id()
+        if list_id is not None:
+            self.set_target_requested.emit(list_id)
 
     def _on_item_clicked(self, item: QListWidgetItem) -> None:
         self._on_current_changed(item, None)

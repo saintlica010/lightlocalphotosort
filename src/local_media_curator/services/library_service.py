@@ -59,6 +59,7 @@ class LibraryService:
         *,
         include_rejected: bool = False,
         rejected_only: bool = False,
+        culling_state: str | None = None,
         sort_by: str = "file_name",
         media_type: str | None = None,
         extension: str | None = None,
@@ -68,6 +69,7 @@ class LibraryService:
         rows = self._media.list_media(
             include_rejected=include_rejected,
             rejected_only=rejected_only,
+            culling_state=culling_state,
             sort_by=sort_by,
             media_type=media_type,
             extension=extension,
@@ -84,6 +86,7 @@ class LibraryService:
         extension: str | None = None,
         source_folder: str | None = None,
         missing: bool | None = None,
+        culling_state: str | None = None,
     ) -> list[Media]:
         rows = self._media.list_unassigned(
             sort_by=sort_by,
@@ -91,6 +94,7 @@ class LibraryService:
             extension=extension,
             source_folder=source_folder,
             missing=missing,
+            culling_state=culling_state,
         )
         return [Media.from_row(row) for row in rows]
 
@@ -105,6 +109,7 @@ class LibraryService:
         extension: str | None = None,
         source_folder: str | None = None,
         missing: bool | None = None,
+        culling_state: str | None = None,
     ) -> list[Media]:
         prefix = ""
         if source_folder:
@@ -119,4 +124,13 @@ class LibraryService:
             and (ext is None or (media.extension or "").lower() == ext)
             and (prefix == "" or media.normalized_path.startswith(prefix))
             and (missing is None or media.missing == missing)
+            and (culling_state is None or media.culling_state == culling_state)
         ]
+
+    def culling_counts(self) -> dict[str, int]:
+        rows = self._project.connection.execute(
+            "SELECT culling_state, COUNT(*) FROM media GROUP BY culling_state"
+        )
+        counts = {"picked": 0, "undecided": 0, "rejected": 0}
+        counts.update({str(row[0]): int(row[1]) for row in rows})
+        return counts

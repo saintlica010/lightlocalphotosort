@@ -6,7 +6,13 @@ from PySide6.QtGui import QImage, QPainter
 from PySide6.QtWidgets import QStyleOptionViewItem
 
 from local_media_curator.ui.media_model import MediaListModel
-from local_media_curator.ui.thumbnail_delegate import ThumbnailDelegate
+from local_media_curator.ui.thumbnail_delegate import ThumbnailDelegate, culling_marker
+
+
+def test_thumbnail_overlay_state_marker() -> None:
+    assert culling_marker("picked") == "✓"
+    assert culling_marker("rejected") == "×"
+    assert culling_marker("undecided") is None
 
 
 def test_delegate_paint_does_not_open_source_image(qtbot, tmp_path: Path, monkeypatch) -> None:

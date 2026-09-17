@@ -112,7 +112,7 @@ def test_library_views_are_chinese(loaded_window) -> None:
     window, _project = loaded_window
     views = window.library_panel.views
     names = [views.item(i).text() for i in range(views.count())]
-    assert names == ["全部", "未分配", "已排除"]
+    assert names == ["全部", "未分配", "已选", "未决定", "已排除"]
 
 
 def test_filter_options_are_chinese(loaded_window) -> None:
@@ -153,7 +153,7 @@ def test_preview_form_labels_are_chinese(loaded_window) -> None:
         "拍摄时间",
         "修改时间",
         "名单",
-        "已排除",
+        "整理状态",
     ]
 
 

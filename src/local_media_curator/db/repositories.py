@@ -104,8 +104,8 @@ class MediaRepository:
             INSERT INTO media (
                 absolute_path, normalized_path, media_type, file_name, extension,
                 file_size, width, height, duration_ms, captured_at, modified_at,
-                imported_at, rejected, missing, fingerprint
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NULL)
+                imported_at, culling_state, missing, fingerprint
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'undecided', 0, NULL)
             """,
             (
                 absolute_path,
@@ -150,30 +150,48 @@ class MediaRepository:
             (int(missing), media_id),
         )
 
-    def set_rejected(self, media_ids: list[int], rejected: bool) -> None:
+    def set_culling_state(self, media_ids: list[int], state: str) -> None:
         if not media_ids:
             return
+        if state not in {"undecided", "picked", "rejected"}:
+            raise ValueError(f"Invalid culling state: {state}")
         placeholders = ",".join("?" * len(media_ids))
         self._conn.execute(
-            f"UPDATE media SET rejected = ? WHERE id IN ({placeholders})",
-            (int(rejected), *media_ids),
+            f"""
+            UPDATE media
+            SET culling_state = ?, rejected = ?
+            WHERE id IN ({placeholders})
+            """,
+            (state, int(state == "rejected"), *media_ids),
         )
 
-    def rejection_states(self, media_ids: list[int]) -> dict[int, bool]:
+
+    def culling_states(self, media_ids: list[int]) -> dict[int, str]:
         if not media_ids:
             return {}
         placeholders = ",".join("?" * len(media_ids))
         rows = self._conn.execute(
-            f"SELECT id, rejected FROM media WHERE id IN ({placeholders})",
+            f"SELECT id, culling_state FROM media WHERE id IN ({placeholders})",
             tuple(media_ids),
         )
-        return {int(row[0]): bool(row[1]) for row in rows}
+        return {int(row[0]): str(row[1]) for row in rows}
+
+    def set_rejected(self, media_ids: list[int], rejected: bool) -> None:
+        """Phase 1 compatibility wrapper; culling_state remains authoritative."""
+        self.set_culling_state(media_ids, "rejected" if rejected else "undecided")
+
+    def rejection_states(self, media_ids: list[int]) -> dict[int, bool]:
+        return {
+            media_id: state == "rejected"
+            for media_id, state in self.culling_states(media_ids).items()
+        }
 
     def list_media(
         self,
         *,
         include_rejected: bool = False,
         rejected_only: bool = False,
+        culling_state: str | None = None,
         sort_by: str = "file_name",
         media_type: str | None = None,
         extension: str | None = None,
@@ -182,10 +200,15 @@ class MediaRepository:
     ) -> list[sqlite3.Row]:
         clauses: list[str] = []
         params: list[object] = []
-        if rejected_only:
-            clauses.append("rejected = 1")
+        if culling_state is not None:
+            if culling_state not in {"undecided", "picked", "rejected"}:
+                raise ValueError(f"Invalid culling state: {culling_state}")
+            clauses.append("culling_state = ?")
+            params.append(culling_state)
+        elif rejected_only:
+            clauses.append("culling_state = 'rejected'")
         elif not include_rejected:
-            clauses.append("rejected = 0")
+            clauses.append("culling_state != 'rejected'")
         self._append_filters(clauses, params, media_type, extension, source_folder, missing)
         return self._select_media(clauses, params, sort_by)
 
@@ -197,12 +220,19 @@ class MediaRepository:
         extension: str | None = None,
         source_folder: str | None = None,
         missing: bool | None = None,
+        culling_state: str | None = None,
     ) -> list[sqlite3.Row]:
         clauses = [
-            "rejected = 0",
             "id NOT IN (SELECT media_id FROM list_items)",
         ]
         params: list[object] = []
+        if culling_state is not None:
+            if culling_state not in {"undecided", "picked", "rejected"}:
+                raise ValueError(f"Invalid culling state: {culling_state}")
+            clauses.append("culling_state = ?")
+            params.append(culling_state)
+        else:
+            clauses.append("culling_state != 'rejected'")
         self._append_filters(clauses, params, media_type, extension, source_folder, missing)
         return self._select_media(clauses, params, sort_by)
 
@@ -251,6 +281,31 @@ class MediaRepository:
         return [by_id[media_id] for media_id in media_ids if media_id in by_id]
 
 
+class ProjectSettingsRepository:
+    """Small key/value store for project-owned preferences."""
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._conn = connection
+
+    def get(self, key: str) -> str | None:
+        row = self._conn.execute(
+            "SELECT value FROM project_settings WHERE key = ?", (key,)
+        ).fetchone()
+        return None if row is None or row[0] is None else str(row[0])
+
+    def set(self, key: str, value: str) -> None:
+        self._conn.execute(
+            """
+            INSERT INTO project_settings (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (key, value),
+        )
+
+    def delete(self, key: str) -> None:
+        self._conn.execute("DELETE FROM project_settings WHERE key = ?", (key,))
+
+
 class ListRepository:
     def __init__(self, connection: sqlite3.Connection) -> None:
         self._conn = connection
@@ -297,6 +352,12 @@ class ListRepository:
 
     def delete(self, list_id: int) -> None:
         self._conn.execute("DELETE FROM lists WHERE id = ?", (list_id,))
+        # The setting is deliberately not a foreign key so the preference
+        # table stays generic. Clear it atomically with list deletion.
+        self._conn.execute(
+            "DELETE FROM project_settings WHERE key = 'target_list_id' AND value = ?",
+            (str(list_id),),
+        )
 
     def count_items(self, list_id: int) -> int:
         row = self._conn.execute(

@@ -6,7 +6,18 @@ from pathlib import Path
 
 from PySide6.QtCore import QModelIndex, Qt, QThread, Slot
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QInputDialog,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPlainTextEdit,
+    QSplitter,
+    QTextEdit,
+    QWidget,
+)
 
 from local_media_curator.domain.models import Media, Project
 from local_media_curator.media.scan_worker import ScanWorker
@@ -28,7 +39,13 @@ from local_media_curator.ui.media_grid import MediaGrid
 from local_media_curator.ui.media_model import MediaListModel
 from local_media_curator.ui.preview_panel import PreviewPanel
 
-_LIBRARY_VIEW_ROWS = {"all": 0, "unassigned": 1, "rejected": 2}
+_LIBRARY_VIEW_ROWS = {
+    "all": 0,
+    "unassigned": 1,
+    "picked": 2,
+    "undecided": 3,
+    "rejected": 4,
+}
 _SCAN_STOP_TIMEOUT_MS = 30000
 
 
@@ -52,12 +69,14 @@ class MainWindow(QMainWindow):
         self._thumb_needed: dict[int, str] = {}
         self._thumb_paths: dict[int, str] = {}
         self._pending_selection: list[int] = []
+        self._target_id: int | None = None
         self.setWindowTitle("本地媒体整理")
 
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.library_panel = LibraryPanel()
         self.media_grid = MediaGrid()
         self.preview_panel = PreviewPanel()
+        self.target_list_label = self.library_panel.list_panel.target_label
         splitter.addWidget(self.library_panel)
         splitter.addWidget(self.media_grid)
         splitter.addWidget(self.preview_panel)
@@ -77,11 +96,18 @@ class MainWindow(QMainWindow):
         self.library_panel.list_panel.create_requested.connect(self._on_create_list)
         self.library_panel.list_panel.rename_requested.connect(self._on_rename_list)
         self.library_panel.list_panel.delete_requested.connect(self._on_delete_list)
+        self.library_panel.list_panel.set_target_requested.connect(
+            self._on_set_target_list
+        )
         self.media_grid.model.orderChanged.connect(self.apply_grid_order)
         self._set_project_actions_enabled(False)
 
     def set_undo_stack(self, stack: CurationUndoStack | None) -> None:
         self.undo_stack = stack
+
+    @property
+    def target_list_id(self) -> int | None:
+        return self._target_id
 
     def set_project(self, project: Project) -> None:
         self._stop_scan_thread()
@@ -208,6 +234,12 @@ class MainWindow(QMainWindow):
 
     def refresh(self) -> None:
         self._reload_lists()
+        if self.library_service is None:
+            self.library_panel.set_culling_counts({})
+        else:
+            self.library_panel.set_culling_counts(
+                self.library_service.culling_counts()
+            )
         self._reload_grid()
 
     def _run_curation(self, action: Callable[[], None]) -> bool:
@@ -327,24 +359,192 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     def reject_selection(self) -> None:
+        if not self._curation_shortcut_allowed():
+            return
         if self.undo_stack is None:
             return
         media_ids = self.media_grid.selected_ids()
         if not media_ids:
             return
-        if not self._run_curation(lambda: self.undo_stack.reject(media_ids)):
+        self.set_culling_state("rejected", media_ids)
+
+    def reject_selection_and_advance(self) -> None:
+        if not self._curation_shortcut_allowed():
             return
+        self.set_culling_state("rejected", advance=True)
+
+    def pick_selection(self, advance: bool = False) -> None:
+        if not self._curation_shortcut_allowed():
+            return
+        self.set_culling_state("picked", advance=advance)
+
+    def undecide_selection(self, advance: bool = False) -> None:
+        if not self._curation_shortcut_allowed():
+            return
+        self.set_culling_state("undecided", advance=advance)
+
+    def set_culling_state(
+        self,
+        state: str,
+        media_ids: list[int] | None = None,
+        *,
+        advance: bool = False,
+    ) -> None:
+        if self.undo_stack is None:
+            return
+        ids = media_ids if media_ids is not None else self.media_grid.selected_ids()
+        if not ids and media_ids is None:
+            # A non-advance action can hide the current item (for example X in
+            # the default library view). Keep P/X/U able to operate on that
+            # pending selection so the next key can restore or reclassify it.
+            ids = list(self._pending_selection)
+        if not ids:
+            return
+        visible_ids = self._visible_media_ids() if advance else []
+        advance_to = self._next_visible_id(visible_ids, ids) if advance else None
+        if state == "rejected":
+            operation = lambda: self.undo_stack.reject(ids)
+        else:
+            operation = lambda: self.undo_stack.set_culling_state(ids, state)
+        if not self._run_curation(operation):
+            return
+        self._refresh_after_curation(advance_to if advance else None)
+
+    def _refresh_after_curation(self, advance_to: int | None) -> None:
+        if advance_to is None:
+            self.refresh()
+            return
+        # Do not let _reload_grid restore the just-acted-on selection or leave
+        # it in _pending_selection when the action removes it from the view.
+        selection = self.media_grid.view.selectionModel()
+        if selection is not None:
+            selection.clearSelection()
+            selection.clearCurrentIndex()
+        self._pending_selection = []
         self.refresh()
+        if advance_to in self._visible_media_ids():
+            self._select_media_ids([advance_to])
+
+    def _visible_media_ids(self) -> list[int]:
+        ids: list[int] = []
+        model = self.media_grid.model
+        for row in range(model.rowCount()):
+            value = model.data(model.index(row), MediaListModel.IdRole)
+            if value is not None:
+                ids.append(int(value))
+        return ids
+
+    def _next_visible_id(
+        self, visible_ids: list[int], selected_ids: list[int]
+    ) -> int | None:
+        if not visible_ids:
+            return None
+        selected_positions = [
+            index
+            for index, media_id in enumerate(visible_ids)
+            if media_id in selected_ids
+        ]
+        if not selected_positions:
+            current = self.media_grid.view.currentIndex()
+            anchor = current.row() if current.isValid() else -1
+        else:
+            # For a multi-selection, continue after the last selected visible
+            # item while preserving the view's existing order.
+            anchor = max(selected_positions)
+        return visible_ids[anchor + 1] if anchor + 1 < len(visible_ids) else None
 
     def restore_selection(self) -> None:
-        if self.undo_stack is None:
+        self.undecide_selection()
+
+    def _curation_shortcut_allowed(self) -> bool:
+        """Keep single-letter curation keys inside text editors harmless."""
+        widget = QApplication.focusWidget()
+        while widget is not None:
+            if isinstance(widget, (QLineEdit, QTextEdit, QPlainTextEdit, QInputDialog)):
+                return False
+            if isinstance(widget, QComboBox) and widget.isEditable():
+                return False
+            widget = widget.parentWidget()
+        return True
+
+    def _target_list_from_settings(self) -> int | None:
+        if self.list_service is None:
+            return None
+        return self.list_service.target_list_id()
+
+    def _target_list_name(self, list_id: int | None) -> str | None:
+        if list_id is None or self.list_service is None:
+            return None
+        return next(
+            (
+                str(row["name"])
+                for row in self.list_service.all_lists()
+                if int(row["id"]) == list_id
+            ),
+            None,
+        )
+
+    def _refresh_target_indicator(self) -> None:
+        target_id = self._target_list_from_settings()
+        self._target_id = target_id
+        self.library_panel.list_panel.set_target_list(self._target_list_name(target_id))
+
+    def _on_set_target_list(self, list_id: object = None) -> None:
+        if self.list_service is None:
+            return
+        selected_id = int(list_id) if list_id is not None else self._target_list_id()
+        if selected_id is None:
+            selected_id = self._choose_list_id()
+        if selected_id is None:
+            return
+        try:
+            self.list_service.set_target_list(selected_id)
+        except ValueError as exc:
+            show_warning(self, "设置目标名单", str(exc))
+            return
+        self._refresh_target_indicator()
+
+    def set_target_list(self, list_id: int) -> None:
+        self._on_set_target_list(list_id)
+
+    def toggle_target_selection(self) -> None:
+        if not self._curation_shortcut_allowed():
+            return
+        target_id = self._target_list_from_settings()
+        if target_id is None:
+            self.statusBar().showMessage("请先设置目标名单。")
             return
         media_ids = self.media_grid.selected_ids()
-        if not media_ids:
+        if not media_ids or self.undo_stack is None:
             return
-        if not self._run_curation(lambda: self.undo_stack.restore(media_ids)):
+        existing = set(self.list_service.ordered_media_ids(target_id))
+        if set(media_ids).issubset(existing):
+            operation = lambda: self.undo_stack.remove_items(target_id, media_ids)
+        else:
+            missing = [media_id for media_id in media_ids if media_id not in existing]
+            operation = lambda: self.undo_stack.add_items(target_id, missing)
+        if self._run_curation(operation):
+            self.refresh()
+
+    def add_to_target_and_advance(self) -> None:
+        if not self._curation_shortcut_allowed():
             return
-        self.refresh()
+        target_id = self._target_list_from_settings()
+        if target_id is None:
+            self.statusBar().showMessage("请先设置目标名单。")
+            return
+        media_ids = self.media_grid.selected_ids()
+        if not media_ids or self.undo_stack is None:
+            return
+        visible_ids = self._visible_media_ids()
+        advance_to = self._next_visible_id(visible_ids, media_ids)
+        existing = set(self.list_service.ordered_media_ids(target_id))
+        missing = [media_id for media_id in media_ids if media_id not in existing]
+        if missing and not self._run_curation(
+            lambda: self.undo_stack.add_items(target_id, missing)
+        ):
+            return
+        self._refresh_after_curation(advance_to)
 
     def _install_menus(self) -> None:
         file_menu = self.menuBar().addMenu("文件")
@@ -433,7 +633,6 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(self.move_down_action)
         edit_menu.addAction(self.move_start_action)
         edit_menu.addAction(self.move_end_action)
-
         self.media_grid.view.setContextMenuPolicy(
             Qt.ContextMenuPolicy.ActionsContextMenu
         )
@@ -442,10 +641,85 @@ class MainWindow(QMainWindow):
         self.media_grid.view.addAction(add_to_list)
         self.media_grid.view.addAction(remove_from_list)
 
+        self.pick_action = QAction("标记为已选", self)
+        self.pick_action.setShortcut(QKeySequence("P"))
+        self.pick_action.triggered.connect(self.pick_selection)
+        self.culling_reject_action = QAction("标记为已排除", self)
+        self.culling_reject_action.setShortcut(QKeySequence("X"))
+        self.culling_reject_action.triggered.connect(self.reject_selection)
+        self.undecide_action = QAction("标记为未决定", self)
+        self.undecide_action.setShortcut(QKeySequence("U"))
+        self.undecide_action.triggered.connect(self.undecide_selection)
+        self.pick_and_advance_action = QAction("标记为已选并前进", self)
+        self.pick_and_advance_action.setShortcut(QKeySequence("Shift+P"))
+        self.pick_and_advance_action.triggered.connect(
+            lambda _checked=False: self.pick_selection(advance=True)
+        )
+        self.culling_reject_and_advance_action = QAction(
+            "标记为已排除并前进", self
+        )
+        self.culling_reject_and_advance_action.setShortcut(QKeySequence("Shift+X"))
+        self.culling_reject_and_advance_action.triggered.connect(
+            lambda _checked=False: self.reject_selection_and_advance()
+        )
+        self.undecide_and_advance_action = QAction("标记为未决定并前进", self)
+        self.undecide_and_advance_action.setShortcut(QKeySequence("Shift+U"))
+        self.undecide_and_advance_action.triggered.connect(
+            lambda _checked=False: self.undecide_selection(advance=True)
+        )
+        self.shift_pick_action = self.pick_and_advance_action
+        self.shift_reject_action = self.culling_reject_and_advance_action
+        self.shift_undecide_action = self.undecide_and_advance_action
+        self.set_target_list_action = QAction("设为目标名单", self)
+        self.set_target_list_action.triggered.connect(
+            lambda _checked=False: self._on_set_target_list()
+        )
+        self.target_toggle_action = QAction("在目标名单中切换", self)
+        self.target_toggle_action.setShortcut(QKeySequence("B"))
+        self.target_toggle_action.triggered.connect(
+            lambda _checked=False: self.toggle_target_selection()
+        )
+        self.target_add_and_advance_action = QAction("加入目标名单并前进", self)
+        self.target_add_and_advance_action.setShortcut(QKeySequence("Shift+B"))
+        self.target_add_and_advance_action.triggered.connect(
+            lambda _checked=False: self.add_to_target_and_advance()
+        )
+        self.set_target_action = self.set_target_list_action
+        self.target_add_action = self.target_add_and_advance_action
+        self.target_list_toggle_action = self.target_toggle_action
+        self.target_list_add_action = self.target_add_and_advance_action
+        for action in (
+            self.pick_action,
+            self.culling_reject_action,
+            self.undecide_action,
+            self.pick_and_advance_action,
+            self.culling_reject_and_advance_action,
+            self.undecide_and_advance_action,
+            self.set_target_list_action,
+            self.target_toggle_action,
+            self.target_add_and_advance_action,
+        ):
+            self.addAction(action)
+            edit_menu.addAction(action)
+            self.media_grid.view.addAction(action)
+
     def _set_project_actions_enabled(self, enabled: bool) -> None:
         self.add_source_action.setEnabled(enabled)
         self.remove_source_action.setEnabled(enabled)
         self.scan_action.setEnabled(enabled)
+        for action in (
+            getattr(self, "pick_action", None),
+            getattr(self, "culling_reject_action", None),
+            getattr(self, "undecide_action", None),
+            getattr(self, "pick_and_advance_action", None),
+            getattr(self, "culling_reject_and_advance_action", None),
+            getattr(self, "undecide_and_advance_action", None),
+            getattr(self, "set_target_list_action", None),
+            getattr(self, "target_toggle_action", None),
+            getattr(self, "target_add_and_advance_action", None),
+        ):
+            if action is not None:
+                action.setEnabled(enabled)
 
     def _set_reorder_actions_enabled(self, enabled: bool) -> None:
         self.move_up_action.setEnabled(enabled)
@@ -460,6 +734,7 @@ class MainWindow(QMainWindow):
         wanted = set(media_ids)
         selection.clearSelection()
         first = None
+        indexes = []
         for row in range(self.media_grid.model.rowCount()):
             index = self.media_grid.model.index(row)
             value = self.media_grid.model.data(index, MediaListModel.IdRole)
@@ -467,11 +742,14 @@ class MainWindow(QMainWindow):
                 continue
             if first is None:
                 first = index
-                selection.select(index, selection.SelectionFlag.ClearAndSelect)
-            else:
-                selection.select(index, selection.SelectionFlag.Select)
+            indexes.append(index)
+        # Select every matching index before setting the current index. Using
+        # the view's setCurrentIndex last can apply its default selection
+        # command and collapse a multi-selection on some Qt platforms.
+        for index in indexes:
+            selection.select(index, selection.SelectionFlag.Select)
         if first is not None:
-            self.media_grid.view.setCurrentIndex(first)
+            selection.setCurrentIndex(first, selection.SelectionFlag.NoUpdate)
 
     def _on_new_project(self) -> None:
         path = choose_existing_directory(self, "新建项目")
@@ -687,6 +965,7 @@ class MainWindow(QMainWindow):
             self.library_panel.set_source_folders(
                 [str(row["path"]) for row in self.library_service._source_folders.list_enabled()]
             )
+        self._refresh_target_indicator()
 
     def _reload_grid(self) -> None:
         if self.library_service is None:
@@ -772,10 +1051,10 @@ class MainWindow(QMainWindow):
         extension = filters["extension"]
         source_folder = filters["source_folder"]
         missing = filters["missing"]
-        if self._view_mode == "rejected":
+        if self._view_mode in {"picked", "undecided", "rejected"}:
             return self.library_service.list_media(
                 include_rejected=True,
-                rejected_only=True,
+                culling_state=self._view_mode,
                 sort_by=self._sort_by,
                 media_type=media_type,
                 extension=extension,
@@ -820,6 +1099,7 @@ class MainWindow(QMainWindow):
             "id": media.id,
             "file_name": media.file_name,
             "absolute_path": media.absolute_path,
+            "culling_state": media.culling_state,
             "rejected": media.rejected,
             "ordinal": ordinal,
             "thumbnail_path": self._thumb_paths.get(media.id),

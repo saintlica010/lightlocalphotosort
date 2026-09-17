@@ -48,6 +48,7 @@ class Media:
     captured_at: str | None
     modified_at: str | None
     imported_at: str
+    culling_state: str
     rejected: bool
     missing: bool
     fingerprint: str | None
@@ -68,7 +69,10 @@ class Media:
             captured_at=row["captured_at"],
             modified_at=row["modified_at"],
             imported_at=str(row["imported_at"]),
-            rejected=bool(row["rejected"]),
+            culling_state=str(row["culling_state"]),
+            # Kept as a read-only compatibility projection for Phase 1
+            # callers. All runtime writes go through culling_state.
+            rejected=str(row["culling_state"]) == "rejected",
             missing=bool(row["missing"]),
             fingerprint=row["fingerprint"],
         )

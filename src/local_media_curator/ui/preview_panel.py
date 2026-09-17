@@ -82,7 +82,7 @@ class PreviewPanel(QWidget):
         self.captured_at_label = QLabel()
         self.modified_at_label = QLabel()
         self.lists_label = QLabel()
-        self.rejected_label = QLabel()
+        self.culling_state_label = QLabel()
         self.path_label.setWordWrap(True)
         self.path_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
@@ -95,7 +95,7 @@ class PreviewPanel(QWidget):
         form.addRow("拍摄时间", self.captured_at_label)
         form.addRow("修改时间", self.modified_at_label)
         form.addRow("名单", self.lists_label)
-        form.addRow("已排除", self.rejected_label)
+        form.addRow("整理状态", self.culling_state_label)
         layout = QVBoxLayout(self)
         layout.addWidget(self.image_view, stretch=1)
         layout.addLayout(form)
@@ -114,7 +114,12 @@ class PreviewPanel(QWidget):
         if size is None:
             size = media.get("size")
         lists = media.get("lists")
-        rejected = bool(media.get("rejected", False))
+        state = str(media.get("culling_state") or (
+            "rejected" if media.get("rejected", False) else "undecided"
+        ))
+        state_label = {"picked": "已选", "undecided": "未决定", "rejected": "已排除"}.get(
+            state, "未决定"
+        )
         self.file_name_label.setText(str(media.get("file_name") or ""))
         self.path_label.setText(path_text)
         self.dimensions_label.setText(
@@ -124,7 +129,7 @@ class PreviewPanel(QWidget):
         self.captured_at_label.setText(str(media.get("captured_at") or ""))
         self.modified_at_label.setText(str(media.get("modified_at") or ""))
         self.lists_label.setText(_format_lists(lists))
-        self.rejected_label.setText("是" if rejected else "否")
+        self.culling_state_label.setText(state_label)
         self._load_preview(path_value)
 
     def open_original(self) -> None:
@@ -142,7 +147,7 @@ class PreviewPanel(QWidget):
         self.captured_at_label.clear()
         self.modified_at_label.clear()
         self.lists_label.clear()
-        self.rejected_label.clear()
+        self.culling_state_label.clear()
         self.image_view.set_image(None)
 
     def _load_preview(self, path_value: object) -> None:

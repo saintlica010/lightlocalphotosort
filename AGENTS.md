@@ -314,6 +314,7 @@ Read these files before implementation when they exist:
 
 ```text
 AGENTS.md
+docs/PHASE2_PLAN.md
 lightphotosprt/SKILL.md
 lightphotosprt/REQUIREMENTS_SUMMARY.md
 REQUIREMENTS_SUMMARY.md
@@ -329,6 +330,7 @@ Priority in case of conflict:
 
 ```text
 AGENTS.md
+→ docs/PHASE2_PLAN.md
 → DECISIONS.md
 → explicit local requirements
 → SKILL.md
@@ -419,10 +421,11 @@ Preferred stack:
 - standard `sqlite3` or a deliberately thin persistence layer
 - Pillow
 - `pillow-heif` only when HEIC support is enabled
-- FFmpeg/ffprobe for video functionality when Phase 2 begins
 - pytest
 - pytest-qt
 - PyInstaller
+
+Video thumbnails, playback, enhanced video metadata, and FFmpeg integration are explicitly deferred beyond Phase 2.
 
 Avoid adding dependencies without a demonstrated requirement.
 
@@ -565,7 +568,8 @@ CREATE TABLE media (
     modified_at TEXT,
     imported_at TEXT NOT NULL,
 
-    rejected INTEGER NOT NULL DEFAULT 0,
+    culling_state TEXT NOT NULL DEFAULT 'undecided'
+        CHECK (culling_state IN ('undecided', 'picked', 'rejected')),
     missing INTEGER NOT NULL DEFAULT 0,
 
     fingerprint TEXT
@@ -805,8 +809,7 @@ Filters:
 - source folder;
 - virtual list;
 - unassigned;
-- rejected;
-- not rejected;
+- culling state: picked / undecided / rejected;
 - missing/not missing.
 
 The UI must make it clear whether the user is seeing:
@@ -841,25 +844,31 @@ Display:
 - captured time;
 - modified time;
 - list membership;
-- rejection state.
+- culling state.
 
 Opening the original must not cause the application itself to modify it.
 
 ---
 
-## 22. Rejection
+## 22. Three-State Culling
 
-Rejecting a media item means setting logical project state.
+Every media item has exactly one logical culling state:
 
-It does not delete the source file.
+```text
+undecided
+picked
+rejected
+```
 
-Default library views should hide rejected media.
+Do not model the Phase 2 state with independent picked/rejected booleans.
 
-Provide a dedicated Rejected view.
+The schema v2 migration may retain the Phase 1 `rejected` column only as a synchronized compatibility projection. Runtime decisions and writes must treat `culling_state` as authoritative so two independent states cannot drift.
 
-Support restore.
+Changing culling state never deletes, moves, renames, or rewrites the source file.
 
-Reject and restore must participate in Undo/Redo.
+Provide Picked, Undecided, and Rejected views. Existing Phase 1 projects migrate `rejected = 1` to `rejected` and `rejected = 0` to `undecided` without changing list membership or manual order.
+
+Single-item and bulk culling actions must participate in the existing Undo/Redo stack. One bulk action is one undo unit.
 
 No physical delete command is required for the MVP.
 
@@ -871,13 +880,12 @@ If one is introduced later, it must be separately designed and explicitly approv
 
 Use Qt's undo framework when practical.
 
-MVP undoable actions:
+Undoable actions include:
 
 - add to list;
 - remove from list;
 - reorder;
-- reject;
-- restore.
+- set culling state, including bulk changes.
 
 Undo operates on application/database state.
 
@@ -948,11 +956,9 @@ Use bounded queues and cancellation/version tokens.
 
 ---
 
-## 26. Phase 1 — Build Now
+## 26. Phase 1 — Stable Baseline
 
-Do not perform another long architecture phase.
-
-Implement the MVP in this order:
+Phase 1 is the regression baseline for Phase 2. Preserve the behavior and tests described below; do not rebuild it or repeat architecture discovery unless new evidence reveals a blocker.
 
 ### 26.1 Skeleton
 
@@ -1151,23 +1157,38 @@ Tests must never rename, move, modify, or delete media outside their temporary f
 
 ---
 
-## 31. Phase 2
+## 31. Phase 2 — Keyboard-First Culling and Portable Lists
 
-Only after the image-first MVP is stable, add:
+The detailed plan is `docs/PHASE2_PLAN.md`. Implement it in gated milestones and do not begin a later milestone until the preceding gate has been independently reviewed.
 
-- video thumbnails;
-- optional video playback;
-- list export;
-- JSON/CSV export manifest;
-- duplicate output name handling;
-- cancellation;
-- stronger moved-file reconciliation.
+### 31.1 Phase 2A — Culling Core
 
-Default file export operation is Copy.
+Implement first:
 
-Export destinations must never silently overwrite originals.
+- schema version 2;
+- one `culling_state` field with `undecided`, `picked`, or `rejected`;
+- lossless v1 → v2 migration from the Phase 1 `rejected` field;
+- P / X / U for picked / rejected / undecided;
+- single- and multi-selection culling;
+- one undo unit per bulk action using the existing undo stack;
+- Picked / Undecided / Rejected filters and live counts;
+- lightweight state overlays in the existing thumbnail delegate.
 
-Never default to Move.
+The Phase 2A gate requires migration coverage, culling and bulk-undo coverage, filter/count/overlay coverage, source immutability, and 1k/10k regression checks. Preserve all named lists and their independent manual order during migration.
+
+### 31.2 Phase 2B — Keyboard Workflow
+
+After 2A review, implement advance-after-action shortcuts, the persistent Target List, B / Shift+B, keyboard focus safety, and visible menu shortcuts.
+
+### 31.3 Phase 2C — Portable Lists
+
+After 2B review, implement `.llplist.json` export/import, exact manual-order round trips, deterministic source-root remapping, and explicit missing/ambiguous reports. Absolute paths must not be the only portable identity.
+
+### 31.4 Phase 2D — Interop and Closeout
+
+After 2C review, implement CSV, TXT, and clipboard export, then complete regression, performance, packaged-EXE, privacy, and documentation checks.
+
+Phase 2 export means list/manifest export, not copying physical source media. Video work and a full visual redesign are out of scope.
 
 ---
 
@@ -1205,6 +1226,7 @@ README.md
 AGENTS.md
 ARCHITECTURE.md
 DECISIONS.md
+docs/PHASE2_PLAN.md
 pyproject.toml
 src/
 tests/

@@ -13,8 +13,8 @@ from PySide6.QtWidgets import (
 from local_media_curator.ui.list_panel import ListPanel
 
 # Internal view keys stay English; only the displayed labels are Chinese.
-_VIEW_NAMES = ("all", "unassigned", "rejected")
-_VIEW_LABELS = ("全部", "未分配", "已排除")
+_VIEW_NAMES = ("all", "unassigned", "picked", "undecided", "rejected")
+_VIEW_LABELS = ("全部", "未分配", "已选", "未决定", "已排除")
 _SORT_OPTIONS = (
     ("file_name", "文件名"),
     ("captured_at", "拍摄时间"),
@@ -72,6 +72,16 @@ class LibraryPanel(QWidget):
         for label, value in self._MISSING_OPTIONS:
             self.missing_combo.addItem(label, value)
         self.missing_combo.currentIndexChanged.connect(self._emit_filters_changed)
+        self.culling_count_labels: dict[str, QLabel] = {}
+        counts_layout = QVBoxLayout()
+        for state, label in (
+            ("picked", "已选"),
+            ("undecided", "未决定"),
+            ("rejected", "已排除"),
+        ):
+            count_label = QLabel(f"{label}：0")
+            self.culling_count_labels[state] = count_label
+            counts_layout.addWidget(count_label)
         self.list_panel = ListPanel(self)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("媒体库"))
@@ -82,6 +92,7 @@ class LibraryPanel(QWidget):
         filters_layout.addWidget(self.folder_combo)
         filters_layout.addWidget(self.missing_combo)
         layout.addLayout(filters_layout)
+        layout.addLayout(counts_layout)
         layout.addWidget(self.views)
         layout.addWidget(self.list_panel, stretch=1)
 
@@ -105,6 +116,13 @@ class LibraryPanel(QWidget):
             if index >= 0:
                 self.folder_combo.setCurrentIndex(index)
         self.folder_combo.blockSignals(False)
+
+    def set_culling_counts(self, counts: dict[str, int]) -> None:
+        labels = {"picked": "已选", "undecided": "未决定", "rejected": "已排除"}
+        for state, label in labels.items():
+            self.culling_count_labels[state].setText(
+                f"{label}：{int(counts.get(state, 0)):,}"
+            )
 
     def _emit_filters_changed(self, _index: int) -> None:
         self.filters_changed.emit()

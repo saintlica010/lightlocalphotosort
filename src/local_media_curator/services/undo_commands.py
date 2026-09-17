@@ -9,30 +9,24 @@ from local_media_curator.services.rejection_service import RejectionService
 __all__ = ["CurationUndoStack"]
 
 
-class _RejectCommand(QUndoCommand):
-    def __init__(self, rejection: RejectionService, media_ids: list[int]) -> None:
-        super().__init__("Reject")
+class _SetCullingStateCommand(QUndoCommand):
+    def __init__(
+        self,
+        rejection: RejectionService,
+        before: dict[int, str],
+        after: str,
+    ) -> None:
+        super().__init__(f"Set culling state: {after}")
         self._rejection = rejection
-        self._media_ids = list(media_ids)
+        self._before = dict(before)
+        self._after = after
+        self._media_ids = list(before)
 
     def redo(self) -> None:
-        self._rejection.reject(self._media_ids)
+        self._rejection.set_state(self._media_ids, self._after)
 
     def undo(self) -> None:
-        self._rejection.restore(self._media_ids)
-
-
-class _RestoreCommand(QUndoCommand):
-    def __init__(self, rejection: RejectionService, media_ids: list[int]) -> None:
-        super().__init__("Restore")
-        self._rejection = rejection
-        self._media_ids = list(media_ids)
-
-    def redo(self) -> None:
-        self._rejection.restore(self._media_ids)
-
-    def undo(self) -> None:
-        self._rejection.reject(self._media_ids)
+        self._rejection.restore_states(self._before)
 
 
 class _ReorderCommand(QUndoCommand):
@@ -170,22 +164,21 @@ class CurationUndoStack:
         self._stack.redo()
 
     def reject(self, media_ids: list[int]) -> None:
-        states = self._rejection.states(media_ids)
-        to_change = [
-            media_id for media_id in media_ids if not states.get(media_id, True)
-        ]
-        if not to_change:
-            return
-        self._stack.push(_RejectCommand(self._rejection, to_change))
+        self.set_culling_state(media_ids, "rejected")
 
     def restore(self, media_ids: list[int]) -> None:
-        states = self._rejection.states(media_ids)
-        to_change = [
-            media_id for media_id in media_ids if states.get(media_id, False)
-        ]
-        if not to_change:
+        self.set_culling_state(media_ids, "undecided")
+
+    def set_culling_state(self, media_ids: list[int], state: str) -> None:
+        if state not in {"undecided", "picked", "rejected"}:
+            raise ValueError(f"Invalid culling state: {state}")
+        states = self._rejection.states(list(dict.fromkeys(media_ids)))
+        before = {media_id: current for media_id, current in states.items() if current != state}
+        if not before:
             return
-        self._stack.push(_RestoreCommand(self._rejection, to_change))
+        # A single command captures all selected rows, so bulk culling is one
+        # undo unit even when the selection contains mixed prior states.
+        self._stack.push(_SetCullingStateCommand(self._rejection, before, state))
 
     def reorder(self, list_id: int, media_ids_in_order: list[int]) -> None:
         self._stack.push(
