@@ -39,6 +39,9 @@ htmlcov/
 .worktrees/
 .superpowers/
 
+# Bug screenshots — local review material, never committed
+/bugs/
+
 # Editors and OS
 .idea/
 .vscode/
