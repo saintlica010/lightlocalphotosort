@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from local_media_curator.services.library_service import LibraryService
@@ -23,6 +24,21 @@ def test_remove_source_folder_keeps_media_and_files(tmp_path: Path) -> None:
     assert folders == 0
     assert media == 1
     assert photo.is_file()
+    project.close()
+
+
+def test_add_source_folder_rejects_overlap(tmp_path: Path) -> None:
+    project = create_project(tmp_path / "MyProject")
+    inside = project.root / "media"
+    inside.mkdir()
+    with pytest.raises(ValueError, match="overlap"):
+        LibraryService(project).add_source_folder(inside)
+    parent = tmp_path
+    with pytest.raises(ValueError, match="overlap"):
+        LibraryService(project).add_source_folder(parent)
+    sibling = tmp_path / "Pictures"
+    sibling.mkdir()
+    LibraryService(project).add_source_folder(sibling)
     project.close()
 
 

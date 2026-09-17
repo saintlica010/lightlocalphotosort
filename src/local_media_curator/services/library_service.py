@@ -5,6 +5,7 @@ from pathlib import Path
 
 from local_media_curator.db.repositories import MediaRepository, SourceFolderRepository
 from local_media_curator.domain.models import Media, Project, ScanResult
+from local_media_curator.domain.paths import reject_overlapping_roots
 from local_media_curator.media.scanner import scan_source_folder
 
 
@@ -15,6 +16,7 @@ class LibraryService:
         self._media = MediaRepository(project.connection)
 
     def add_source_folder(self, path: Path, *, recursive: bool = True) -> None:
+        reject_overlapping_roots(self._project.root, path)
         self._source_folders.add(path, recursive=recursive)
 
     def remove_source_folder(self, path: Path) -> None:

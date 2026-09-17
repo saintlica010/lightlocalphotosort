@@ -66,9 +66,9 @@ def test_scan_skips_files_under_thumbnails_dir(tmp_path: Path) -> None:
     source.mkdir()
     Image.new("RGB", (10, 10)).save(source / "A.jpg", "JPEG")
     Image.new("RGB", (10, 10)).save(project.thumbnails_dir / "cached.jpg", "JPEG")
-    lib = LibraryService(project)
-    lib.add_source_folder(tmp_path)
-    lib.scan()
+    # Parent-of-project sources are rejected by LibraryService; exercise
+    # scanner skip_dirs directly for defense-in-depth.
+    scan_source_folder(project, tmp_path)
     names = {
         str(row[0])
         for row in project.connection.execute("SELECT file_name FROM media")
