@@ -88,14 +88,14 @@ class PreviewPanel(QWidget):
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
         form = QFormLayout()
-        form.addRow("File name", self.file_name_label)
-        form.addRow("Path", self.path_label)
-        form.addRow("Dimensions", self.dimensions_label)
-        form.addRow("Size", self.size_label)
-        form.addRow("Captured", self.captured_at_label)
-        form.addRow("Modified", self.modified_at_label)
-        form.addRow("Lists", self.lists_label)
-        form.addRow("Rejected", self.rejected_label)
+        form.addRow("文件名", self.file_name_label)
+        form.addRow("路径", self.path_label)
+        form.addRow("尺寸", self.dimensions_label)
+        form.addRow("大小", self.size_label)
+        form.addRow("拍摄时间", self.captured_at_label)
+        form.addRow("修改时间", self.modified_at_label)
+        form.addRow("名单", self.lists_label)
+        form.addRow("已排除", self.rejected_label)
         layout = QVBoxLayout(self)
         layout.addWidget(self.image_view, stretch=1)
         layout.addLayout(form)
@@ -120,11 +120,11 @@ class PreviewPanel(QWidget):
         self.dimensions_label.setText(
             f"{width} × {height}" if width is not None and height is not None else ""
         )
-        self.size_label.setText(f"{size} bytes" if size is not None else "")
+        self.size_label.setText(f"{size} 字节" if size is not None else "")
         self.captured_at_label.setText(str(media.get("captured_at") or ""))
         self.modified_at_label.setText(str(media.get("modified_at") or ""))
         self.lists_label.setText(_format_lists(lists))
-        self.rejected_label.setText("Yes" if rejected else "No")
+        self.rejected_label.setText("是" if rejected else "否")
         self._load_preview(path_value)
 
     def open_original(self) -> None:

@@ -183,7 +183,7 @@ def test_file_menu_has_remove_source_folder(qtbot) -> None:
         titles.extend(
             child.text() for child in menu.actions() if not child.isSeparator()
         )
-    assert "Remove Source Folder" in titles
+    assert "移除源文件夹" in titles
 
 
 def test_library_sort_combo_does_not_rewrite_list_sort_keys(
@@ -234,12 +234,12 @@ def test_status_tip_distinguishes_library_and_list(qtbot, tmp_path: Path) -> Non
     window.add_source_folder(source)
     window.scan()
     qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 1, timeout=8000)
-    assert window.statusBar().currentMessage() == "Library (sorted)"
+    assert window.statusBar().currentMessage() == "媒体库（自动排序）"
     list_id = window.list_service.create("Promotional")
     window.show_list(list_id)
-    assert window.statusBar().currentMessage() == "List (manual order)"
+    assert window.statusBar().currentMessage() == "名单（手动排序）"
     window.show_library_view("all")
-    assert window.statusBar().currentMessage() == "Library (sorted)"
+    assert window.statusBar().currentMessage() == "媒体库（自动排序）"
     project.close()
 
 

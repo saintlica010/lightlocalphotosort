@@ -3,6 +3,8 @@ from pathlib import Path
 from PIL import Image
 from PySide6.QtCore import Qt
 
+from local_media_curator.services.library_service import LibraryService
+from local_media_curator.services.list_service import ListService
 from local_media_curator.services.project_service import create_project
 from local_media_curator.ui.library_panel import LibraryPanel
 from local_media_curator.ui.main_window import MainWindow
@@ -211,10 +213,42 @@ def test_present_filter_disables_reorder_in_named_list(qtbot, tmp_path: Path) ->
 
 
 def test_missing_filter_disables_reorder_in_named_list(qtbot, tmp_path: Path) -> None:
-    project, window, list_id, ids, src1, _src2 = _filtered_list_window(qtbot, tmp_path)
+    """Missing state is created with no window alive.
+
+    Deleting a source file while a window exists races the thumbnail worker,
+    which can still hold the file open; on Windows that is a flaky WinError 32.
+    So the whole scan runs through the services first, and only then does the
+    window open the finished project.
+    """
+    project = create_project(tmp_path / "proj")
+    src1 = tmp_path / "src1"
+    src2 = tmp_path / "src2"
+    src1.mkdir()
+    src2.mkdir()
+    Image.new("RGB", (10, 10)).save(src1 / "A.jpg", "JPEG")
+    Image.new("RGB", (10, 10)).save(src1 / "B.jpg", "JPEG")
+    Image.new("RGB", (10, 10)).save(src2 / "C.png", "PNG")
+    (src2 / "D.mp4").write_bytes(b"not a real video")
+    library = LibraryService(project)
+    library.add_source_folder(src1)
+    library.add_source_folder(src2)
+    library.scan()
     (src1 / "B.jpg").unlink()
-    window.scan()
-    qtbot.waitUntil(lambda: window._scan_thread is None, timeout=8000)
+    library.scan()
+    ids = {
+        media.file_name: media.id
+        for media in library.list_media(include_rejected=True)
+    }
+    lists = ListService(project)
+    list_id = lists.create("Promotional")
+    lists.add_items(
+        list_id, [ids["A.jpg"], ids["B.jpg"], ids["C.png"], ids["D.mp4"]]
+    )
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    window.show_list(list_id)
+    qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 4, timeout=8000)
     combo = window.library_panel.missing_combo
     combo.setCurrentIndex(combo.findData(True))
     assert combo.currentData() is True
@@ -237,7 +271,7 @@ def test_clearing_filters_restores_reorder(qtbot, tmp_path: Path) -> None:
     qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 4, timeout=8000)
     assert _drag_enabled(window)
     assert all(action.isEnabled() for action in _reorder_actions(window))
-    assert window.statusBar().currentMessage() == "List (manual order)"
+    assert window.statusBar().currentMessage() == "名单（手动排序）"
     project.close()
 
 
@@ -301,7 +335,7 @@ def test_scan_failure_restores_order_status(qtbot, tmp_path: Path, monkeypatch) 
         lambda *args, **kwargs: None,
     )
     window._on_scan_failed("boom")
-    assert window.statusBar().currentMessage() == "List (manual order)"
+    assert window.statusBar().currentMessage() == "名单（手动排序）"
     combo = window.library_panel.extension_combo
     combo.setCurrentIndex(combo.findData(".jpg"))
     qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 2, timeout=8000)

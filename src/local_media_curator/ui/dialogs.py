@@ -15,11 +15,11 @@ def choose_existing_directory(parent: QWidget | None, title: str) -> Path | None
 def choose_list_name(
     parent: QWidget | None,
     names: list[str],
-    title: str = "Add to List",
+    title: str = "添加到名单",
 ) -> str | None:
     if not names:
         return None
-    chosen, ok = QInputDialog.getItem(parent, title, "List:", names, 0, False)
+    chosen, ok = QInputDialog.getItem(parent, title, "名单：", names, 0, False)
     if not ok:
         return None
     chosen = chosen.strip()

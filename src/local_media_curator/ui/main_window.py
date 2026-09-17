@@ -47,6 +47,7 @@ class MainWindow(QMainWindow):
         self._thumb_needed: dict[int, str] = {}
         self._thumb_paths: dict[int, str] = {}
         self._pending_selection: list[int] = []
+        self.setWindowTitle("本地媒体整理")
 
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.library_panel = LibraryPanel()
@@ -133,14 +134,14 @@ class MainWindow(QMainWindow):
         worker.progress.connect(self._on_scan_progress, Qt.ConnectionType.QueuedConnection)
         self._scan_worker = worker
         self._scan_thread = thread
-        self.statusBar().showMessage("Scanning...")
+        self.statusBar().showMessage("正在扫描…")
         thread.start()
 
     @Slot(int)
     def _on_scan_progress(self, count: int) -> None:
         if self._scan_worker is None or self.sender() is not self._scan_worker:
             return
-        self.statusBar().showMessage(f"Scanning... {count:,} files processed")
+        self.statusBar().showMessage(f"正在扫描… 已处理 {count:,} 个文件")
 
     def _on_scan_finished(self, _result: object) -> None:
         self._stop_scan_thread()
@@ -163,7 +164,7 @@ class MainWindow(QMainWindow):
     def _on_scan_failed(self, message: str) -> None:
         self._stop_scan_thread()
         self._set_order_status()
-        QMessageBox.warning(self, "Scan", message)
+        QMessageBox.warning(self, "扫描", message)
 
     def _stop_scan_thread(self) -> None:
         thread = self._scan_thread
@@ -209,7 +210,7 @@ class MainWindow(QMainWindow):
             action()
             return True
         except sqlite3.OperationalError:
-            self.statusBar().showMessage("Database is busy. Try again.")
+            self.statusBar().showMessage("数据库忙，请重试。")
             return False
 
     def show_library_view(self, name: str) -> None:
@@ -341,21 +342,21 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     def _install_menus(self) -> None:
-        file_menu = self.menuBar().addMenu("File")
-        new_project = QAction("New Project", self)
+        file_menu = self.menuBar().addMenu("文件")
+        new_project = QAction("新建项目", self)
         new_project.setShortcut(QKeySequence.StandardKey.New)
         new_project.triggered.connect(self._on_new_project)
-        open_project_action = QAction("Open Project", self)
+        open_project_action = QAction("打开项目", self)
         open_project_action.setShortcut(QKeySequence.StandardKey.Open)
         open_project_action.triggered.connect(self._on_open_project)
-        self.add_source_action = QAction("Add Source Folder", self)
+        self.add_source_action = QAction("添加源文件夹", self)
         self.add_source_action.triggered.connect(self._on_add_source_folder)
-        self.remove_source_action = QAction("Remove Source Folder", self)
+        self.remove_source_action = QAction("移除源文件夹", self)
         self.remove_source_action.triggered.connect(self._on_remove_source_folder)
-        self.scan_action = QAction("Scan", self)
+        self.scan_action = QAction("扫描", self)
         self.scan_action.setShortcut(QKeySequence(Qt.Key.Key_F5))
         self.scan_action.triggered.connect(self._on_scan)
-        self.open_original_action = QAction("Open Original", self)
+        self.open_original_action = QAction("打开原文件", self)
         self.open_original_action.triggered.connect(self._on_open_original)
         file_menu.addAction(new_project)
         file_menu.addAction(open_project_action)
@@ -365,42 +366,42 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.scan_action)
         file_menu.addAction(self.open_original_action)
 
-        undo = QAction("Undo", self)
+        undo = QAction("撤销", self)
         undo.setShortcut(QKeySequence.StandardKey.Undo)
         undo.triggered.connect(self._on_undo)
-        redo = QAction("Redo", self)
+        redo = QAction("重做", self)
         redo.setShortcut(QKeySequence("Ctrl+Shift+Z"))
         redo.triggered.connect(self._on_redo)
-        reject = QAction("Reject", self)
+        reject = QAction("排除", self)
         reject.setShortcut(QKeySequence.StandardKey.Delete)
         reject.triggered.connect(self.reject_selection)
-        restore = QAction("Restore", self)
+        restore = QAction("恢复", self)
         restore.triggered.connect(self.restore_selection)
-        add_to_list = QAction("Add to List", self)
+        add_to_list = QAction("添加到名单", self)
         add_to_list.triggered.connect(self._on_add_to_current_list)
-        remove_from_list = QAction("Remove from List", self)
+        remove_from_list = QAction("从名单移除", self)
         remove_from_list.triggered.connect(self._on_remove_from_current_list)
-        self.move_up_action = QAction("Move Up", self)
+        self.move_up_action = QAction("上移", self)
         self.move_up_action.setShortcuts(
             [QKeySequence("["), QKeySequence("Ctrl+Up")]
         )
         self.move_up_action.triggered.connect(lambda: self.move_selection(-1))
-        self.move_down_action = QAction("Move Down", self)
+        self.move_down_action = QAction("下移", self)
         self.move_down_action.setShortcuts(
             [QKeySequence("]"), QKeySequence("Ctrl+Down")]
         )
         self.move_down_action.triggered.connect(lambda: self.move_selection(1))
-        self.move_start_action = QAction("Move to Start", self)
+        self.move_start_action = QAction("移到开头", self)
         self.move_start_action.setShortcut(QKeySequence(Qt.Key.Key_Home))
         self.move_start_action.triggered.connect(
             lambda: self.move_to_ends(end=False)
         )
-        self.move_end_action = QAction("Move to End", self)
+        self.move_end_action = QAction("移到末尾", self)
         self.move_end_action.setShortcut(QKeySequence(Qt.Key.Key_End))
         self.move_end_action.triggered.connect(lambda: self.move_to_ends(end=True))
         self._set_reorder_actions_enabled(False)
 
-        edit_menu = self.menuBar().addMenu("Edit")
+        edit_menu = self.menuBar().addMenu("编辑")
         for action in (
             undo,
             redo,
@@ -468,42 +469,42 @@ class MainWindow(QMainWindow):
             self.media_grid.view.setCurrentIndex(first)
 
     def _on_new_project(self) -> None:
-        path = choose_existing_directory(self, "New Project")
+        path = choose_existing_directory(self, "新建项目")
         if path is None:
             return
         try:
             self.set_project(create_project(path))
         except ValueError as exc:
-            QMessageBox.warning(self, "New Project", str(exc))
+            QMessageBox.warning(self, "新建项目", str(exc))
 
     def _on_open_project(self) -> None:
-        path = choose_existing_directory(self, "Open Project")
+        path = choose_existing_directory(self, "打开项目")
         if path is None:
             return
         try:
             self.set_project(open_project(path))
         except FileNotFoundError:
             QMessageBox.warning(
-                self, "Open Project", "No project found in that folder."
+                self, "打开项目", "该文件夹中没有找到项目。"
             )
         except ValueError as exc:
-            QMessageBox.warning(self, "Open Project", str(exc))
+            QMessageBox.warning(self, "打开项目", str(exc))
 
     def _on_add_source_folder(self) -> None:
         if self.library_service is None:
             return
-        path = choose_existing_directory(self, "Add Source Folder")
+        path = choose_existing_directory(self, "添加源文件夹")
         if path is None:
             return
         try:
             self.add_source_folder(path)
         except ValueError as exc:
-            QMessageBox.warning(self, "Add Source Folder", str(exc))
+            QMessageBox.warning(self, "添加源文件夹", str(exc))
 
     def _on_remove_source_folder(self) -> None:
         if self.library_service is None:
             return
-        path = choose_existing_directory(self, "Remove Source Folder")
+        path = choose_existing_directory(self, "移除源文件夹")
         if path is None:
             return
         self.remove_source_folder(path)
@@ -582,7 +583,7 @@ class MainWindow(QMainWindow):
             list_id = self.list_service.create(name)
         except sqlite3.IntegrityError:
             QMessageBox.warning(
-                self, "New list", f'A list named "{name}" already exists.'
+                self, "新建名单", f'已存在名为"{name}"的名单。'
             )
             return
         self._reload_lists()
@@ -595,7 +596,7 @@ class MainWindow(QMainWindow):
             self.list_service.rename(list_id, name)
         except sqlite3.IntegrityError:
             QMessageBox.warning(
-                self, "Rename list", f'A list named "{name}" already exists.'
+                self, "重命名名单", f'已存在名为"{name}"的名单。'
             )
             return
         self._reload_lists()
@@ -630,8 +631,8 @@ class MainWindow(QMainWindow):
     def _confirm_delete_dialog(self, name: str) -> bool:
         answer = QMessageBox.question(
             self,
-            "Delete list",
-            f'Delete list "{name}"? Original media files are not deleted.',
+            "删除名单",
+            f'确定删除名单"{name}"吗？原始媒体文件不会被删除。',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -756,11 +757,11 @@ class MainWindow(QMainWindow):
         status must always agree with the reorder controls set alongside it.
         """
         if self._view_mode != "list":
-            self.statusBar().showMessage("Library (sorted)")
+            self.statusBar().showMessage("媒体库（自动排序）")
         elif self._filters_active():
             self.statusBar().showMessage("名单（已筛选，排序已禁用）")
         else:
-            self.statusBar().showMessage("List (manual order)")
+            self.statusBar().showMessage("名单（手动排序）")
 
     def _media_for_current_view(self) -> list[Media]:
         assert self.library_service is not None

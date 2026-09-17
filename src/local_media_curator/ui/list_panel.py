@@ -24,9 +24,9 @@ class ListPanel(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.lists_widget = QListWidget(self)
-        self.new_button = QPushButton("New")
-        self.rename_button = QPushButton("Rename")
-        self.delete_button = QPushButton("Delete")
+        self.new_button = QPushButton("新建")
+        self.rename_button = QPushButton("重命名")
+        self.delete_button = QPushButton("删除")
         self.new_button.clicked.connect(self._on_new)
         self.rename_button.clicked.connect(self._on_rename)
         self.delete_button.clicked.connect(self._on_delete)
@@ -39,7 +39,7 @@ class ListPanel(QWidget):
         buttons.addWidget(self.delete_button)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Lists"))
+        layout.addWidget(QLabel("名单"))
         layout.addWidget(self.lists_widget, stretch=1)
         layout.addLayout(buttons)
 
@@ -64,7 +64,7 @@ class ListPanel(QWidget):
         return int(value) if value is not None else None
 
     def _on_new(self) -> None:
-        name, ok = QInputDialog.getText(self, "New list", "Name:")
+        name, ok = QInputDialog.getText(self, "新建名单", "名称：")
         if ok and name.strip():
             self.create_requested.emit(name.strip())
 
@@ -74,7 +74,7 @@ class ListPanel(QWidget):
             return
         item = self.lists_widget.currentItem()
         current = item.text() if item is not None else ""
-        name, ok = QInputDialog.getText(self, "Rename list", "Name:", text=current)
+        name, ok = QInputDialog.getText(self, "重命名名单", "名称：", text=current)
         if ok and name.strip():
             self.rename_requested.emit(list_id, name.strip())
 

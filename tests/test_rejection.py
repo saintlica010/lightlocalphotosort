@@ -68,4 +68,4 @@ def test_library_panel_has_all_unassigned_rejected_views(qtbot) -> None:
     panel = LibraryPanel()
     qtbot.addWidget(panel)
     labels = [panel.views.item(i).text() for i in range(panel.views.count())]
-    assert labels == ["All", "Unassigned", "Rejected"]
+    assert labels == ["全部", "未分配", "已排除"]

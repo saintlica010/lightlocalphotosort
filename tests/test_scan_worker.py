@@ -46,17 +46,17 @@ def test_scan_emits_throttled_progress_on_gui_thread(qtbot, tmp_path: Path) -> N
     threads = []
 
     def record(message):
-        if "files processed" in message:
+        if "已处理" in message:
             messages.append(message)
             threads.append(QThread.currentThread() is window.thread())
 
     window.statusBar().messageChanged.connect(record)
     window.scan()
     qtbot.waitUntil(lambda: window._scan_thread is None, timeout=15000)
-    assert messages[-1] == "Scanning... 30 files processed"
+    assert messages[-1] == "正在扫描… 已处理 30 个文件"
     assert len(messages) <= 4
     assert all(threads)
-    assert window.statusBar().currentMessage() == "Library (sorted)"
+    assert window.statusBar().currentMessage() == "媒体库（自动排序）"
     window.close()
     project.close()
 
@@ -307,5 +307,5 @@ def test_reject_during_locked_db_shows_status_not_raise(qtbot, tmp_path: Path) -
 
     window.undo_stack.reject = boom  # type: ignore[method-assign]
     window.reject_selection()
-    assert "busy" in window.statusBar().currentMessage().lower()
+    assert "忙" in window.statusBar().currentMessage()
     project.close()

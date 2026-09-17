@@ -95,11 +95,11 @@ def test_file_menu_has_project_actions(qtbot) -> None:
         titles.extend(
             child.text() for child in menu.actions() if not child.isSeparator()
         )
-    assert "New Project" in titles
-    assert "Open Project" in titles
-    assert "Add Source Folder" in titles
-    assert "Scan" in titles
-    assert "Open Original" in titles
+    assert "新建项目" in titles
+    assert "打开项目" in titles
+    assert "添加源文件夹" in titles
+    assert "扫描" in titles
+    assert "打开原文件" in titles
 
 
 def test_library_views_switch_grid(qtbot, tmp_path: Path) -> None:
@@ -220,7 +220,7 @@ def test_add_to_list_from_all_media_uses_picker(qtbot, tmp_path: Path) -> None:
     window.media_grid.view.setCurrentIndex(window.media_grid.model.index(0))
     media_id = int(window.media_grid.model.row_at(0)["id"])
     window.list_name_picker = lambda _names: "Promotional"
-    add = next(action for action in window.actions() if action.text() == "Add to List")
+    add = next(action for action in window.actions() if action.text() == "添加到名单")
     add.trigger()
     assert window.list_service.ordered_media_ids(list_id) == [media_id]
     project.close()

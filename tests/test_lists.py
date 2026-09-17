@@ -113,7 +113,7 @@ def test_rename_duplicate_list_shows_warning(qtbot, tmp_path: Path, monkeypatch)
     )
     window._on_rename_list(b_id, "A")
     assert shown
-    assert "already exists" in shown[0]
+    assert "已存在" in shown[0]
     names = {int(row["id"]): str(row["name"]) for row in window.list_service.all_lists()}
     assert names[b_id] == "B"
     project.close()
