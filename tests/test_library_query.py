@@ -78,10 +78,10 @@ def test_add_source_overlap_dialog(qtbot, tmp_path: Path, monkeypatch) -> None:
     window.set_project(project)
     monkeypatch.setattr(module, "choose_existing_directory", lambda *_: tmp_path)
     warnings = []
-    monkeypatch.setattr(module.QMessageBox, "warning", lambda *args: warnings.append(args))
+    monkeypatch.setattr(module, "show_warning", lambda *args: warnings.append(args))
     window._on_add_source_folder()
     assert len(warnings) == 1
-    assert "overlap" in warnings[0][2].lower()
+    assert "重叠" in warnings[0][2]
     window.close()
     project.close()
 
@@ -108,10 +108,12 @@ def test_add_source_folder_rejects_overlap(tmp_path: Path) -> None:
     project = create_project(tmp_path / "MyProject")
     inside = project.root / "media"
     inside.mkdir()
-    with pytest.raises(ValueError, match="overlap"):
+    # Match the message, not "overlap": pytest's tmp_path embeds the test name
+    # (truncated), and that path appears in the message.
+    with pytest.raises(ValueError, match="不能重叠"):
         LibraryService(project).add_source_folder(inside)
     parent = tmp_path
-    with pytest.raises(ValueError, match="overlap"):
+    with pytest.raises(ValueError, match="不能重叠"):
         LibraryService(project).add_source_folder(parent)
     sibling = tmp_path / "Pictures"
     sibling.mkdir()

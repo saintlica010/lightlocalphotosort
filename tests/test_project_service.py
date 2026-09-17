@@ -35,7 +35,10 @@ def test_open_missing_project_raises(tmp_path: Path) -> None:
 
 
 def test_create_project_refuses_photos_tree(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="photos"):
+    # Match the message, not "photos": pytest's tmp_path embeds the test name,
+    # and that path appears in the message, so a loose pattern matches the
+    # fixture instead of the behaviour under test.
+    with pytest.raises(ValueError, match="受保护的目录"):
         create_project(tmp_path / "photos" / "proj")
     assert not (tmp_path / "photos" / "proj").exists()
 
@@ -44,7 +47,7 @@ def test_open_project_refuses_photos_tree(tmp_path: Path) -> None:
     root = tmp_path / "photos" / "proj"
     root.mkdir(parents=True)
     (root / "project.sqlite3").write_bytes(b"")
-    with pytest.raises(ValueError, match="photos"):
+    with pytest.raises(ValueError, match="受保护的目录"):
         open_project(root)
 
 
@@ -54,7 +57,7 @@ def test_paths_overlap_project_inside_source(tmp_path: Path) -> None:
     source.mkdir()
     project.mkdir()
     assert paths_overlap(project, source) is True
-    with pytest.raises(ValueError, match="overlap"):
+    with pytest.raises(ValueError, match="不能重叠"):
         reject_overlapping_roots(project, source)
 
 
@@ -64,7 +67,7 @@ def test_paths_overlap_source_inside_project(tmp_path: Path) -> None:
     project.mkdir()
     source.mkdir()
     assert paths_overlap(project, source) is True
-    with pytest.raises(ValueError, match="overlap"):
+    with pytest.raises(ValueError, match="不能重叠"):
         reject_overlapping_roots(project, source)
 
 

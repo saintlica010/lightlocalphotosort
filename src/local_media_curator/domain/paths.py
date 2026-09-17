@@ -19,6 +19,8 @@ def paths_overlap(left: Path, right: Path) -> bool:
 
 def reject_overlapping_roots(project_root: Path, source_root: Path) -> None:
     if paths_overlap(project_root, source_root):
+        # Shown verbatim to the user via str(exc), so it is Chinese. The two
+        # paths are data and stay as they are.
         raise ValueError(
-            f"Project and source folders overlap: {project_root} vs {source_root}"
+            f"项目目录与源文件夹不能重叠：{project_root} 与 {source_root}"
         )

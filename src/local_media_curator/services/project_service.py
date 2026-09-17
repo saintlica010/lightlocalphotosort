@@ -18,8 +18,10 @@ def _reject_protected_project_root(root: Path) -> None:
     }
     if blocked:
         names = ", ".join(sorted(blocked, key=str.casefold))
+        # Shown verbatim to the user via str(exc), so it is Chinese. The
+        # directory names and the path are data and stay as they are.
         raise ValueError(
-            f"Project root cannot be inside {names}: {root}"
+            f"项目根目录不能位于受保护的目录内（{names}）：{root}"
         )
 
 

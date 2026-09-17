@@ -331,7 +331,7 @@ def test_scan_failure_restores_order_status(qtbot, tmp_path: Path, monkeypatch) 
         qtbot, tmp_path
     )
     monkeypatch.setattr(
-        "local_media_curator.ui.main_window.QMessageBox.warning",
+        "local_media_curator.ui.main_window.show_warning",
         lambda *args, **kwargs: None,
     )
     window._on_scan_failed("boom")

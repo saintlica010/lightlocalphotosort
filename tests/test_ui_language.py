@@ -183,23 +183,65 @@ def test_no_english_ui_words_remain(loaded_window) -> None:
     assert offenders == []
 
 
-def test_qt_standard_dialog_buttons_are_chinese(qtbot) -> None:
-    """Qt's own Yes/No/OK labels come from Qt's catalogue, not from our code."""
+def test_confirm_dialog_buttons_are_chinese(qtbot, monkeypatch) -> None:
+    """Asserted on our helper, not on Qt's catalogue.
+
+    Relying on Qt's own translation turned out to be unreliable: loading
+    qt_zh_CN succeeds from the source tree but fails inside the frozen EXE, so
+    the confirmation dialog showed English 'Yes'/'No' in a Chinese UI. The
+    button text must be set by our code so packaging cannot change it.
+    """
     from PySide6.QtWidgets import QMessageBox
 
-    from local_media_curator.app import create_app
+    from local_media_curator.ui.dialogs import ask_confirm
 
-    create_app()
-    box = QMessageBox()
-    qtbot.addWidget(box)
-    box.setStandardButtons(
-        QMessageBox.StandardButton.Yes
-        | QMessageBox.StandardButton.No
-        | QMessageBox.StandardButton.Cancel
-    )
-    texts = [button.text() for button in box.buttons()]
-    assert texts
-    assert all(CJK.search(text) for text in texts), texts
+    captured: dict[str, list[str]] = {}
+
+    def fake_exec(box) -> int:
+        captured["texts"] = [button.text() for button in box.buttons()]
+        return int(QMessageBox.StandardButton.No)
+
+    monkeypatch.setattr(QMessageBox, "exec", fake_exec)
+    assert ask_confirm(None, "删除名单", "确定删除名单吗？") is False
+    assert captured["texts"] == ["是", "否"]
+    assert all(CJK.search(text) for text in captured["texts"])
+
+
+def test_warning_dialog_button_is_chinese(qtbot, monkeypatch) -> None:
+    from PySide6.QtWidgets import QMessageBox
+
+    from local_media_curator.ui.dialogs import show_warning
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_exec(box) -> int:
+        captured["texts"] = [button.text() for button in box.buttons()]
+        return int(QMessageBox.StandardButton.Ok)
+
+    monkeypatch.setattr(QMessageBox, "exec", fake_exec)
+    show_warning(None, "扫描", "出错了")
+    assert captured["texts"] == ["确定"]
+
+
+def test_error_messages_shown_to_users_are_chinese(tmp_path: Path) -> None:
+    """These strings reach the user through str(exc) in a dialog."""
+    from local_media_curator.domain.paths import reject_overlapping_roots
+    from local_media_curator.services.project_service import create_project
+
+    inside = tmp_path / "photos" / "sub"
+    inside.mkdir(parents=True)
+    with pytest.raises(ValueError) as protected:
+        create_project(inside)
+    assert CJK.search(str(protected.value))
+    # The directory name is data and stays.
+    assert "photos" in str(protected.value)
+
+    source = tmp_path / "Wedding2026"
+    project = source / "curator"  # nested, so the two roots overlap
+    project.mkdir(parents=True)
+    with pytest.raises(ValueError) as overlap:
+        reject_overlapping_roots(project, source)
+    assert CJK.search(str(overlap.value))
 
 
 def test_user_data_is_never_translated(loaded_window) -> None:

@@ -108,7 +108,7 @@ def test_rename_duplicate_list_shows_warning(qtbot, tmp_path: Path, monkeypatch)
         return 0
 
     monkeypatch.setattr(
-        "local_media_curator.ui.main_window.QMessageBox.warning",
+        "local_media_curator.ui.main_window.show_warning",
         fake_warning,
     )
     window._on_rename_list(b_id, "A")

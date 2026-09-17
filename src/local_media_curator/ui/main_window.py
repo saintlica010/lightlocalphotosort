@@ -17,7 +17,12 @@ from local_media_curator.services.list_service import ListService
 from local_media_curator.services.project_service import create_project, open_project
 from local_media_curator.services.rejection_service import RejectionService
 from local_media_curator.services.undo_commands import CurationUndoStack
-from local_media_curator.ui.dialogs import choose_existing_directory, choose_list_name
+from local_media_curator.ui.dialogs import (
+    ask_confirm,
+    choose_existing_directory,
+    choose_list_name,
+    show_warning,
+)
 from local_media_curator.ui.library_panel import LibraryPanel
 from local_media_curator.ui.media_grid import MediaGrid
 from local_media_curator.ui.media_model import MediaListModel
@@ -164,7 +169,7 @@ class MainWindow(QMainWindow):
     def _on_scan_failed(self, message: str) -> None:
         self._stop_scan_thread()
         self._set_order_status()
-        QMessageBox.warning(self, "扫描", message)
+        show_warning(self, "扫描", message)
 
     def _stop_scan_thread(self) -> None:
         thread = self._scan_thread
@@ -475,7 +480,7 @@ class MainWindow(QMainWindow):
         try:
             self.set_project(create_project(path))
         except ValueError as exc:
-            QMessageBox.warning(self, "新建项目", str(exc))
+            show_warning(self, "新建项目", str(exc))
 
     def _on_open_project(self) -> None:
         path = choose_existing_directory(self, "打开项目")
@@ -484,11 +489,11 @@ class MainWindow(QMainWindow):
         try:
             self.set_project(open_project(path))
         except FileNotFoundError:
-            QMessageBox.warning(
+            show_warning(
                 self, "打开项目", "该文件夹中没有找到项目。"
             )
         except ValueError as exc:
-            QMessageBox.warning(self, "打开项目", str(exc))
+            show_warning(self, "打开项目", str(exc))
 
     def _on_add_source_folder(self) -> None:
         if self.library_service is None:
@@ -499,7 +504,7 @@ class MainWindow(QMainWindow):
         try:
             self.add_source_folder(path)
         except ValueError as exc:
-            QMessageBox.warning(self, "添加源文件夹", str(exc))
+            show_warning(self, "添加源文件夹", str(exc))
 
     def _on_remove_source_folder(self) -> None:
         if self.library_service is None:
@@ -582,7 +587,7 @@ class MainWindow(QMainWindow):
         try:
             list_id = self.list_service.create(name)
         except sqlite3.IntegrityError:
-            QMessageBox.warning(
+            show_warning(
                 self, "新建名单", f'已存在名为"{name}"的名单。'
             )
             return
@@ -595,7 +600,7 @@ class MainWindow(QMainWindow):
         try:
             self.list_service.rename(list_id, name)
         except sqlite3.IntegrityError:
-            QMessageBox.warning(
+            show_warning(
                 self, "重命名名单", f'已存在名为"{name}"的名单。'
             )
             return
@@ -629,14 +634,11 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     def _confirm_delete_dialog(self, name: str) -> bool:
-        answer = QMessageBox.question(
+        return ask_confirm(
             self,
             "删除名单",
             f'确定删除名单"{name}"吗？原始媒体文件不会被删除。',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
         )
-        return answer == QMessageBox.StandardButton.Yes
 
     def _target_list_id(self) -> int | None:
         if self._current_list_id is not None:
