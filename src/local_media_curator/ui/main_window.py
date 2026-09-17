@@ -45,6 +45,7 @@ class MainWindow(QMainWindow):
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
         self._thumb_needed: dict[int, str] = {}
+        self._thumb_paths: dict[int, str] = {}
 
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.library_panel = LibraryPanel()
@@ -87,6 +88,7 @@ class MainWindow(QMainWindow):
         self._view_mode = "all"
         self._current_list_id = None
         self._sort_by = self.library_panel.current_sort()
+        self._thumb_paths = {}
         if previous is not None and previous is not project:
             previous.close()
         self._set_project_actions_enabled(True)
@@ -696,7 +698,7 @@ class MainWindow(QMainWindow):
             "absolute_path": media.absolute_path,
             "rejected": media.rejected,
             "ordinal": ordinal,
-            "thumbnail_path": self._thumbnail_path(media),
+            "thumbnail_path": self._thumb_paths.get(media.id),
             "width": media.width,
             "height": media.height,
             "file_size": media.file_size,
@@ -719,29 +721,16 @@ class MainWindow(QMainWindow):
         self, items: list[Media], rows: list[dict[str, object]]
     ) -> list[tuple[int, str]]:
         jobs: list[tuple[int, str]] = []
-        for media, row in zip(items, rows, strict=True):
-            if row.get("thumbnail_path"):
+        for media in items:
+            if media.id in self._thumb_paths:
                 continue
             if media.media_type != "image" or media.missing:
                 continue
-            path = Path(media.absolute_path)
-            if not path.is_file():
-                continue
-            jobs.append((media.id, str(path)))
+            jobs.append((media.id, media.absolute_path))
         return jobs
 
-    def _thumbnail_path(self, media: Media) -> str | None:
-        if self.thumbnail_service is None:
-            return None
-        if media.media_type != "image" or media.missing:
-            return None
-        path = Path(media.absolute_path)
-        if not path.is_file():
-            return None
-        cached = self.thumbnail_service.cached_path(media.id, path)
-        return str(cached) if cached is not None else None
-
     def _on_thumbnail_ready(self, media_id: int, path: str) -> None:
+        self._thumb_paths[int(media_id)] = path
         self._thumb_needed.pop(int(media_id), None)
         self.media_grid.model.set_thumbnail_path(int(media_id), path)
 

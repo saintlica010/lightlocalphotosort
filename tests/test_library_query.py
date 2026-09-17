@@ -207,3 +207,56 @@ def test_grid_reload_does_not_issue_per_item_list_name_queries(
     assert len(membership_queries) <= 1
     assert window.media_grid.model.rowCount() == 3
     project.close()
+
+
+def test_grid_reload_does_not_stat_each_source_or_cache_path(
+    qtbot, tmp_path: Path, monkeypatch
+) -> None:
+    from local_media_curator.db.repositories import MediaRepository
+    from local_media_curator.domain.paths import normalize_path
+    from local_media_curator.media.thumbnail_service import ThumbnailService
+
+    project = create_project(tmp_path / "proj")
+    repo = MediaRepository(project.connection)
+    for i in range(40):
+        path = tmp_path / "src" / f"{i:02d}.jpg"
+        repo.insert(
+            absolute_path=str(path),
+            normalized_path=normalize_path(path),
+            media_type="image",
+            file_name=path.name,
+            extension=".jpg",
+            file_size=10,
+            width=10,
+            height=10,
+            duration_ms=None,
+            captured_at="2026-01-01T00:00:00",
+            modified_at="2026-01-01T00:00:00",
+            imported_at="2026-01-01T00:00:00",
+        )
+    project.connection.commit()
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    cached_calls: list[int] = []
+    is_file_calls: list[str] = []
+    real_cached = ThumbnailService.cached_path
+    real_is_file = Path.is_file
+
+    def counting_cached(self, media_id, source_path, *args, **kwargs):
+        cached_calls.append(int(media_id))
+        return real_cached(self, media_id, source_path, *args, **kwargs)
+
+    def counting_is_file(self):
+        is_file_calls.append(str(self))
+        return real_is_file(self)
+
+    monkeypatch.setattr(ThumbnailService, "cached_path", counting_cached)
+    monkeypatch.setattr(Path, "is_file", counting_is_file)
+    cached_calls.clear()
+    is_file_calls.clear()
+    window.show_library_view("all")
+    assert window.media_grid.model.rowCount() == 40
+    assert cached_calls == []
+    assert is_file_calls == []
+    project.close()
