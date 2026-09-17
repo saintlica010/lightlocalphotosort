@@ -14,6 +14,53 @@ from local_media_curator.services.project_service import create_project
 from local_media_curator.ui.main_window import MainWindow
 
 
+def test_scan_progress_is_cumulative_and_counts_unchanged(tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    library = LibraryService(project)
+    for name in ("one", "two"):
+        source = tmp_path / name
+        source.mkdir()
+        for i in range(30):
+            Image.new("RGB", (8, 8)).save(source / f"{i}.jpg")
+        library.add_source_folder(source)
+    try:
+        for _ in range(2):
+            counts = []
+            library.scan(progress_cb=counts.append)
+            assert counts == [1, 25, 30, 31, 55, 60]
+    finally:
+        project.close()
+
+
+def test_scan_emits_throttled_progress_on_gui_thread(qtbot, tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "src"
+    source.mkdir()
+    for i in range(30):
+        Image.new("RGB", (8, 8)).save(source / f"{i}.jpg")
+    LibraryService(project).add_source_folder(source)
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    messages = []
+    threads = []
+
+    def record(message):
+        if "files processed" in message:
+            messages.append(message)
+            threads.append(QThread.currentThread() is window.thread())
+
+    window.statusBar().messageChanged.connect(record)
+    window.scan()
+    qtbot.waitUntil(lambda: window._scan_thread is None, timeout=15000)
+    assert messages[-1] == "Scanning... 30 files processed"
+    assert len(messages) <= 4
+    assert all(threads)
+    assert window.statusBar().currentMessage() == "Library (sorted)"
+    window.close()
+    project.close()
+
+
 def test_connect_enables_wal(tmp_path: Path) -> None:
     conn = connect(tmp_path / "p.sqlite3")
     mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
@@ -31,9 +78,9 @@ def test_scan_worker_does_not_block_and_persists(qtbot, tmp_path: Path, monkeypa
     scan_threads: list[threading.Thread] = []
     real_scan = LibraryService.scan
 
-    def recording_scan(self, cancel_check=None):
+    def recording_scan(self, cancel_check=None, **kwargs):
         scan_threads.append(threading.current_thread())
-        return real_scan(self, cancel_check=cancel_check)
+        return real_scan(self, cancel_check=cancel_check, **kwargs)
 
     monkeypatch.setattr(LibraryService, "scan", recording_scan)
 

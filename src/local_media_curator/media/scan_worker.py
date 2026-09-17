@@ -14,6 +14,7 @@ class ScanWorker(QObject):
     finished = Signal(object)
     failed = Signal(str)
     cancelled = Signal()
+    progress = Signal(int)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -26,7 +27,9 @@ class ScanWorker(QObject):
         project = None
         try:
             project = open_project(Path(db_path).parent)
-            result = LibraryService(project).scan(cancel_check=self._cancel.is_set)
+            result = LibraryService(project).scan(
+                cancel_check=self._cancel.is_set, progress_cb=self.progress.emit
+            )
             self.finished.emit(result)
         except ScanCancelled:
             self.cancelled.emit()

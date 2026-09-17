@@ -4,7 +4,7 @@ import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QModelIndex, Qt, QThread
+from PySide6.QtCore import QModelIndex, Qt, QThread, Slot
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter, QWidget
 
@@ -64,6 +64,7 @@ class MainWindow(QMainWindow):
         self.media_grid.viewportRowsChanged.connect(self._on_viewport_rows_changed)
         self.library_panel.view_changed.connect(self._on_library_view_changed)
         self.library_panel.sort_changed.connect(self._on_library_sort_changed)
+        self.library_panel.filters_changed.connect(self._on_filters_changed)
         self.library_panel.list_panel.current_list_changed.connect(
             self._on_named_list_changed
         )
@@ -129,9 +130,17 @@ class MainWindow(QMainWindow):
         worker.finished.connect(self._on_scan_finished)
         worker.failed.connect(self._on_scan_failed)
         worker.cancelled.connect(self._on_scan_cancelled)
+        worker.progress.connect(self._on_scan_progress, Qt.ConnectionType.QueuedConnection)
         self._scan_worker = worker
         self._scan_thread = thread
+        self.statusBar().showMessage("Scanning...")
         thread.start()
+
+    @Slot(int)
+    def _on_scan_progress(self, count: int) -> None:
+        if self._scan_worker is None or self.sender() is not self._scan_worker:
+            return
+        self.statusBar().showMessage(f"Scanning... {count:,} files processed")
 
     def _on_scan_finished(self, _result: object) -> None:
         self._stop_scan_thread()
@@ -153,6 +162,7 @@ class MainWindow(QMainWindow):
 
     def _on_scan_failed(self, message: str) -> None:
         self._stop_scan_thread()
+        self._set_order_status(self._view_mode == "list")
         QMessageBox.warning(self, "Scan", message)
 
     def _stop_scan_thread(self) -> None:
@@ -165,6 +175,8 @@ class MainWindow(QMainWindow):
             for signal, slot in (
                 (worker.finished, self._on_scan_finished),
                 (worker.failed, self._on_scan_failed),
+                (worker.cancelled, self._on_scan_cancelled),
+                (worker.progress, self._on_scan_progress),
             ):
                 try:
                     signal.disconnect(slot)
@@ -483,7 +495,10 @@ class MainWindow(QMainWindow):
         path = choose_existing_directory(self, "Add Source Folder")
         if path is None:
             return
-        self.add_source_folder(path)
+        try:
+            self.add_source_folder(path)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Add Source Folder", str(exc))
 
     def _on_remove_source_folder(self) -> None:
         if self.library_service is None:
@@ -496,6 +511,12 @@ class MainWindow(QMainWindow):
     def _on_library_sort_changed(self, sort_by: str) -> None:
         self._sort_by = sort_by
         self._reload_grid()
+
+    def _on_filters_changed(self) -> None:
+        self._reload_grid()
+
+    def _current_filters(self) -> dict[str, object]:
+        return self.library_panel.current_filters()
 
     def _on_scan(self) -> None:
         self.scan()
@@ -659,6 +680,10 @@ class MainWindow(QMainWindow):
         else:
             self.library_panel.list_panel.set_lists(self.list_service.all_lists())
         lists_widget.blockSignals(False)
+        if self.library_service is not None:
+            self.library_panel.set_source_folders(
+                [str(row["path"]) for row in self.library_service._source_folders.list_enabled()]
+            )
 
     def _reload_grid(self) -> None:
         if self.library_service is None:
@@ -722,24 +747,50 @@ class MainWindow(QMainWindow):
 
     def _media_for_current_view(self) -> list[Media]:
         assert self.library_service is not None
+        filters = self._current_filters()
+        media_type = filters["media_type"]
+        extension = filters["extension"]
+        source_folder = filters["source_folder"]
+        missing = filters["missing"]
         if self._view_mode == "rejected":
             return self.library_service.list_media(
                 include_rejected=True,
                 rejected_only=True,
                 sort_by=self._sort_by,
+                media_type=media_type,
+                extension=extension,
+                source_folder=source_folder,
+                missing=missing,
             )
         if self._view_mode == "unassigned":
-            return self.library_service.list_unassigned(sort_by=self._sort_by)
+            return self.library_service.list_unassigned(
+                sort_by=self._sort_by,
+                media_type=media_type,
+                extension=extension,
+                source_folder=source_folder,
+                missing=missing,
+            )
         if (
             self._view_mode == "list"
             and self._current_list_id is not None
             and self.list_service is not None
         ):
             media_ids = self.list_service.ordered_media_ids(self._current_list_id)
-            return self.library_service.list_media_by_ids(media_ids)
+            items = self.library_service.list_media_by_ids(media_ids)
+            return self.library_service.filter_media(
+                items,
+                media_type=media_type,
+                extension=extension,
+                source_folder=source_folder,
+                missing=missing,
+            )
         return self.library_service.list_media(
             include_rejected=False,
             sort_by=self._sort_by,
+            media_type=media_type,
+            extension=extension,
+            source_folder=source_folder,
+            missing=missing,
         )
 
     def _row_from_media(

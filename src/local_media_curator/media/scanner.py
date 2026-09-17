@@ -17,6 +17,7 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}
 VIDEO_EXTENSIONS = {".mp4", ".mov"}
 SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 SCAN_COMMIT_BATCH = 256
+PROGRESS_EVERY = 25
 
 
 class ScanCancelled(Exception):
@@ -75,6 +76,7 @@ def scan_source_folder(
     *,
     recursive: bool = True,
     cancel_check: Callable[[], bool] | None = None,
+    progress_cb: Callable[[int], None] | None = None,
 ) -> ScanResult:
     conn = project.connection
     repo = MediaRepository(conn)
@@ -150,6 +152,10 @@ def scan_source_folder(
                     result.unchanged += 1
 
             processed += 1
+            if progress_cb is not None and (
+                processed == 1 or processed % PROGRESS_EVERY == 0
+            ):
+                progress_cb(processed)
             if processed % SCAN_COMMIT_BATCH == 0:
                 conn.commit()
 
@@ -163,6 +169,10 @@ def scan_source_folder(
             result.missing += 1
 
         conn.commit()
+        if progress_cb is not None and (
+            processed == 0 or (processed != 1 and processed % PROGRESS_EVERY != 0)
+        ):
+            progress_cb(processed)
     except ScanCancelled:
         conn.rollback()
         raise

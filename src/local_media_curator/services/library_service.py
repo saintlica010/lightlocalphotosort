@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -22,15 +23,31 @@ class LibraryService:
     def remove_source_folder(self, path: Path) -> None:
         self._source_folders.remove(path)
 
-    def scan(self, cancel_check: Callable[[], bool] | None = None) -> ScanResult:
+    def scan(
+        self,
+        cancel_check: Callable[[], bool] | None = None,
+        progress_cb: Callable[[int], None] | None = None,
+    ) -> ScanResult:
         total = ScanResult()
+        processed = 0
+        last_reported = -1
+
+        def report(count: int) -> None:
+            nonlocal last_reported
+            cumulative = processed + count
+            if progress_cb is not None and cumulative != last_reported:
+                progress_cb(cumulative)
+                last_reported = cumulative
+
         for row in self._source_folders.list_enabled():
             result = scan_source_folder(
                 self._project,
                 Path(row["path"]),
                 recursive=bool(row["recursive"]),
                 cancel_check=cancel_check,
+                progress_cb=report,
             )
+            processed += result.added + result.modified + result.unchanged
             total.added += result.added
             total.missing += result.missing
             total.unchanged += result.unchanged
@@ -45,6 +62,8 @@ class LibraryService:
         sort_by: str = "file_name",
         media_type: str | None = None,
         extension: str | None = None,
+        source_folder: str | None = None,
+        missing: bool | None = None,
     ) -> list[Media]:
         rows = self._media.list_media(
             include_rejected=include_rejected,
@@ -52,6 +71,8 @@ class LibraryService:
             sort_by=sort_by,
             media_type=media_type,
             extension=extension,
+            source_folder=source_folder,
+            missing=missing,
         )
         return [Media.from_row(row) for row in rows]
 
@@ -61,13 +82,41 @@ class LibraryService:
         sort_by: str = "file_name",
         media_type: str | None = None,
         extension: str | None = None,
+        source_folder: str | None = None,
+        missing: bool | None = None,
     ) -> list[Media]:
         rows = self._media.list_unassigned(
             sort_by=sort_by,
             media_type=media_type,
             extension=extension,
+            source_folder=source_folder,
+            missing=missing,
         )
         return [Media.from_row(row) for row in rows]
 
     def list_media_by_ids(self, media_ids: list[int]) -> list[Media]:
         return [Media.from_row(row) for row in self._media.get_by_ids(media_ids)]
+
+    def filter_media(
+        self,
+        items: list[Media],
+        *,
+        media_type: str | None = None,
+        extension: str | None = None,
+        source_folder: str | None = None,
+        missing: bool | None = None,
+    ) -> list[Media]:
+        prefix = ""
+        if source_folder:
+            prefix = source_folder.rstrip("\\/") + os.sep
+        ext = extension.lower() if extension else None
+        if ext and not ext.startswith("."):
+            ext = f".{ext}"
+        return [
+            media
+            for media in items
+            if (media_type is None or media.media_type == media_type)
+            and (ext is None or (media.extension or "").lower() == ext)
+            and (prefix == "" or media.normalized_path.startswith(prefix))
+            and (missing is None or media.missing == missing)
+        ]
