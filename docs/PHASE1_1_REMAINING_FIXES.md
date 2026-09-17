@@ -136,13 +136,15 @@ Tasks 6, 7, 8 and 9 in the plan are written in full, with tests, and can be exec
 
 This ordering comes from the final whole-branch review's triage, not from the author of this document. Nothing on the deferred list blocks the push that already happened; this is the next agent's work queue.
 
-1. **C1.** It is what review item #3 was actually about, and it is the difference between "usable at 10k" and "19 s freeze per action".
+Status update (`01d9045`): C1, I1, I2, and I3/Task 7 are implemented on this branch (plus M10 delegate paint tests and post-scan `_thumb_paths` invalidation). Next: plan Tasks 6 and 8, then I4 docs, then Tasks 9 and 10.
+
+1. **C1.** ~~It is what review item #3 was actually about, and it is the difference between "usable at 10k" and "19 s freeze per action".~~ **Done** (`49299a0` + `01d9045`).
    - **Verify it with a filesystem-call-count assertion, not a timing test.** A timing assertion will flake across machines; a call-count assertion is exactly the guard whose absence let C1 through. Copy the pattern already in `tests/test_library_query.py::test_grid_reload_does_not_issue_per_item_list_name_queries`.
    - **Arm the delegate test (M10) first.** The delegate is load-bearing for C1's fix, so its "no source decode in `paint()`" invariant must be armed before that refactor touches the code path.
-2. **I1** — batch-commit the scan. This also closes two deferred items as side effects: the orphan-QThread-on-30 s-stall risk, and the missing cancel check in the missing-marking pass (both become near-impossible once cancel latency is bounded).
-3. **I2** — re-select after reload, so undo of a reject keeps the photo selected and previewed.
-4. **I3 / plan Task 7** — the overlap guard. This is the one remaining `AGENTS.md` gap; its tests are already written in the plan.
-5. **Plan Tasks 6 and 8** (items #9, #8) — scan progress and the filter UI, to finish the phase properly.
+2. **I1** — ~~batch-commit the scan.~~ **Done** (`28c7098`). Cancel check in the missing-marking pass is included.
+3. **I2** — ~~re-select after reload.~~ **Done** (`5e6d3cc`).
+4. **I3 / plan Task 7** — ~~the overlap guard.~~ **Done** (`72795aa`). UI still does not catch the ValueError (known minor).
+5. **Plan Tasks 6 and 8** (items #9, #8) — scan progress and the filter UI, to finish the phase properly. **Next.**
 6. **I4 and the `docs/codebase/` refresh together** — so the docs match what C1's fix changes, rather than being refreshed twice.
 7. **Plan Tasks 9 and 10** (items #12, #11) — the 1k/10k perf evidence and the Windows smoke, and the §15 gate.
 8. M2, M3, M4, M5, M6, M7, M8, M9, M1/M12 (fold these two together — the `thumbnail_pool` emit hardening) — opportunistic, while already in those files.

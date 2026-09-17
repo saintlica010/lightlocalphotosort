@@ -8,6 +8,10 @@
 
 **Tech Stack:** Python 3.12 or 3.13 preferred (`AGENTS.md` §12). This machine may only have 3.14 — use it for focused tests; do not add Pillow `Image.init()` or other 3.14 workarounds if a worker segfaults.
 
+## Status as of `01d9045`
+
+All five tasks in this plan are implemented and task-reviewed on `feat/phase1-mvp`. A whole-queue review found one Important (`_thumb_paths` sticky across scans); that is fixed in `01d9045`. Next work is original plan Task 6 (scan progress), then Task 8 (filters), then I4 docs, then Tasks 9–10. Do not merge to `main` unless asked.
+
 ## Global Constraints
 
 - Work on `feat/phase1-mvp` in this clone's existing isolated worktree. Do not merge to `main`.
