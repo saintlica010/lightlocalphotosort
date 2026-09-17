@@ -1,36 +1,34 @@
-# OpenCode handoff — continue Phase 1.1
+# Live handoff — continue Phase 1.1
 
-**This file is the live handoff.** Older docs on the branch are still useful as specs, but several of them are **stale about what is already done**. Follow the read order below.
+**This file is the live handoff.** Other docs on the branch are useful as specs, but several are **stale about what is already done**. Follow the read order below.
 
 Written: 2026-09-17
-For: OpenCode (or any successor agent)
 Repo: `https://github.com/saintlica010/lightlocalphotosort.git`
 Branch: `feat/phase1-mvp`
-Head at handoff: `c230e37` (`c230e37ec26b4795d7f15a026dfbfec3be059762`)
+Head at last update: `1ab2423`
 Do **not** merge to `main` unless the user explicitly asks.
 
 ---
 
-## 0. Paste this into OpenCode first
+## 0. Paste this into a successor agent first
 
 ```text
 Continue Phase 1.1 of lightlocalphotosort on branch feat/phase1-mvp.
 
-Read docs/OPENCODE_HANDOFF.md first. Then AGENTS.md. Then the Task 6 / Task 8
-sections of docs/superpowers/plans/2026-09-16-phase1-1-review-fixes.md.
+Read docs/PHASE1_1_FINAL_REVIEW.md FIRST. It is the live requirements document
+and it lists what still blocks the merge. Then AGENTS.md (the authority).
 
-HEAD should be c230e37. If it is not, git fetch and reset/pull that branch
-before coding.
+HEAD should be 1ab2423 or later. If not, git fetch and pull --ff-only the branch.
 
-Do not re-implement Tasks 1–5 or the pre-Task-6 queue (C1, I1, I2, I3, M10).
-Those are already on the branch.
+Everything in the original implementation plan (Tasks 1-10) is DONE. Do not
+redo it. Also done: C1, I1, I2, I3, I4, M10 from the overnight review.
 
 Next work, in this order:
-1. Plan Task 6 — scan progress
-2. Plan Task 8 — filter UI
-3. I4 — update ARCHITECTURE.md / README to match current code
-4. Plan Task 9 — 1k/10k perf smoke + docs/verification/phase1_1_performance.md
-5. Plan Task 10 — Windows PyInstaller smoke + docs/verification/phase1_1_windows_smoke.md
+1. docs/PHASE1_1_FINAL_REVIEW.md section 2 - disable reorder in filtered lists
+   (MERGE BLOCKER, real correctness bug)
+2. section 1 - all user-facing UI must be Simplified Chinese
+3. section 3 - packaged-EXE full workflow smoke evidence
+4. section 4 - 1k/10k GUI smoke through the real MainWindow
 
 Python 3.12 or 3.13 only. Not 3.14.
 Never modify photos/, phototakeplan/, lightphotosprt/.
@@ -51,22 +49,19 @@ git pull --ff-only origin feat/phase1-mvp
 git rev-parse --short HEAD
 ```
 
-Expected: `c230e37`.
-
-Work wherever the clone is. Do not hard-code another machine's path
-(`C:\downloadbook\...` or `H:\2026shbookfair\...`). If a worktree already
-exists for this branch, use it; do not create a nested one.
+Work wherever the clone is. Do not hard-code another machine's path (`C:\downloadbook\...` or `H:\2026shbookfair\...`). If a worktree already exists for this branch, use it; do not create a nested one.
 
 ---
 
 ## 2. Read order
 
-1. **This file** (`docs/OPENCODE_HANDOFF.md`) — current truth.
-2. **`AGENTS.md`** — product rules. Authority over everything else.
-3. **`docs/PHASE1_1_REVIEW_FIXES.md`** — original GPT review. Items #8, #9, #11, #12 are still open. Items #3–#7 and #10 are done.
-4. **`docs/superpowers/plans/2026-09-16-phase1-1-review-fixes.md`** — implementation plan. **Start at Task 6**, then Task 8, then 9, then 10. Tasks 1–5 and Task 7 are done. The banner at the top of that file still says “do not continue at Task 6” because it was written *before* C1/I1/I2/I3 landed; that banner is now stale. C1 is fixed. You **should** do Task 6 next.
-5. **`docs/superpowers/plans/2026-09-17-phase1-1-pre-task6.md`** — the queue that was between original Task 5 and Task 6. **Complete.** Do not re-run it.
-6. **`docs/PHASE1_1_REMAINING_FIXES.md`** — overnight review. Useful for leftover minors and the “dropped” list. **§0–§3 and the C1/I3 write-ups describe the tree at `4dc8a17` / `7383af3`.** They still claim `paths_overlap` is missing and `_reload_grid` stats every row. That is no longer true. Trust §5’s status update at the top of the queue, and this handoff, over those older sections.
+1. **This file** — current state and rules.
+2. **`docs/PHASE1_1_FINAL_REVIEW.md`** — **the live requirements.** Sections 1–4 are the remaining merge blockers. Section 8 is the acceptance gate.
+3. **`AGENTS.md`** — product rules. Authority over everything else.
+4. **`docs/PHASE1_1_REVIEW_FIXES.md`** — the original review. Items #3–#12 are all done; its §15 gate is superseded by the final review.
+5. **`docs/superpowers/plans/2026-09-16-phase1-1-review-fixes.md`** — the implementation plan. **Tasks 1–10 are complete.** Its top banner is stale; ignore it.
+6. **`docs/PHASE1_1_REMAINING_FIXES.md`** — **historical record of the overnight review at `7383af3`.** Its C1/I1/I2/I3/I4 write-ups are all fixed. Still useful for its **dropped** list and its minor leftovers (§5, §8). Do not read its §0–§3 as current.
+7. **`docs/superpowers/plans/2026-09-17-phase1-1-pre-task6.md`** — the queue between original Task 5 and Task 6. **Complete.** Do not re-run.
 
 `.superpowers/sdd/` is gitignored scratch from a previous agent. It will not be on a fresh clone. Do not depend on it.
 
@@ -90,19 +85,19 @@ PyInstaller one-folder packaging.
 - Tests: generated files under pytest `tmp_path` only. Never use real `photos/`.
 - Never `git add .`. Stage explicit paths. Inspect staged paths before every commit.
 - Do not change git author config (repo-local `lica.liu` is already set on the original clone; set the same on a new clone if empty).
-- Python **3.12 or 3.13** (`AGENTS.md` §12). **Not 3.14.** 3.14.3 segfaults ~5% of full-suite runs in Pillow WebP save on a `QThreadPool` worker (`thumbnail_service.py`). Do not “fix” that with `Image.init()`.
+- Python **3.12 or 3.13** (`AGENTS.md` §12). **Not 3.14.** 3.14.3 segfaults ~5% of full-suite runs in Pillow WebP save on a `QThreadPool` worker (`thumbnail_service.py:102`). This is a toolchain defect, not a project defect. Do **not** “fix” it with `Image.init()`.
 - Qt widgets do not execute SQL. No source decode on the GUI thread. No filesystem scans on the GUI thread.
 - Temporary filter/sort must never rewrite `list_items.sort_key`.
 - Do not merge `feat/phase1-mvp` into `main` unless the user says so.
 - Do not start Phase 2.
 
-Prefer: source safety > correctness > responsiveness > simplicity > extra features.
+Prefer: source safety > correctness > responsiveness > clarity > extra features.
 
 ---
 
 ## 5. What is already done (do not redo)
 
-### Original plan Tasks 1–5 and 7
+### Original plan Tasks 1–10
 
 | Plan task | Review item | Commit |
 |---|---|---|
@@ -112,96 +107,60 @@ Prefer: source safety > correctness > responsiveness > simplicity > extra featur
 | 4 preview latest-wins | #6 | `b81d984` |
 | 5 cooperative scan cancel + off-GUI-thread scan | #7 | `e39bcb3` + `4dc8a17` |
 | 7 project/source overlap | #10 | `72795aa` |
+| 6 scan progress | #9 | `64f4b0b` |
+| 8 library filter UI | #8 | `c9d9894` |
+| 9 1k/10k perf smoke + report | #12 | `47cb85d` |
+| 10 Windows PyInstaller smoke + report | #11 | `6c97b8d` |
 
 Scan used to run on the GUI thread despite `moveToThread`, because a receiverless lambda used AutoConnection. Fixed with `Qt.ConnectionType.DirectConnection` on `thread.started`. Do not revert that.
 
-### Pre-Task-6 remaining-fixes queue (done after the overnight review)
+### Overnight-review findings (all fixed)
 
-| Finding | Commit |
-|---|---|
-| M10 delegate paint does not open source JPEGs | `a210e66` |
-| C1 `_reload_grid` no per-row `is_file` / `cached_path` | `49299a0` |
-| I2 restore selection/preview after refresh | `5e6d3cc` |
-| I1 scan batch commit (`SCAN_COMMIT_BATCH = 256`) + busy status | `28c7098` |
-| I3 overlap guard (`paths_overlap` / `reject_overlapping_roots`) | `72795aa` |
-| C1 follow-up: clear `_thumb_paths` after scan | `01d9045` |
+| Finding | What | Commit |
+|---|---|---|
+| M10 | delegate paint does not open source files | `a210e66` |
+| C1 | `_reload_grid` no per-row `is_file` / `cached_path` | `49299a0` |
+| C1 follow-up | clear `_thumb_paths` after scan | `01d9045` |
+| I2 | restore selection/preview after refresh | `5e6d3cc` |
+| I1 | scan batch commit (`SCAN_COMMIT_BATCH = 256`) + busy status | `28c7098` |
+| I3 | overlap guard (`paths_overlap` / `reject_overlapping_roots`) | `72795aa` |
+| I4 | ARCHITECTURE.md / README refreshed | `bc2178e` |
 
-C1 used to freeze the UI ~19 s at 10k rows on a slow-stat machine (O(N) `stat`/`resolve` on the GUI thread). The shape is fixed: reload uses `self._thumb_paths` filled by `_on_thumbnail_ready`. After a scan, `_thumb_paths` is cleared so workers re-`ensure()` (disk cache still wins for unchanged files).
+C1 used to freeze the UI ~19 s at 10k rows (O(N) `stat`/`resolve` on the GUI thread). Reload now uses `self._thumb_paths`, filled by `_on_thumbnail_ready`; after a scan it is cleared so workers re-`ensure()` (the disk cache still wins for unchanged files).
+
+Current suite: **127 passed, 1 skipped** on Python 3.12.
 
 ---
 
 ## 6. What to do next
 
-### 6.1 Task 6 — scan progress (review item #9)
+**All of section 1–4 of `docs/PHASE1_1_FINAL_REVIEW.md`.** That document carries the full requirements, the translation table, and the acceptance gate. Summary of order and why:
 
-Spec: `docs/superpowers/plans/2026-09-16-phase1-1-review-fixes.md` → **Task 6**.
-Review text: `docs/PHASE1_1_REVIEW_FIXES.md` §9.
+### 6.1 Section 2 — disable reorder while a named list is filtered (MERGE BLOCKER, do this first)
 
-Required behavior:
+A named list can still be dragged/reordered while display filters hide some of its members. Dragging then submits only the visible subset to the full-list reorder path, so **hidden photos move implicitly**. `AGENTS.md` §20 forbids a temporary filter from rewriting manual order.
 
-- `progress_cb: Callable[[int], None] | None` on the scan path
-- `ScanWorker.progress = Signal(int)`
-- Status: `Scanning... {n:,} files processed`
-- Throttle: `PROGRESS_EVERY = 25` (do not emit every file)
-- Queued connection onto the GUI thread; do not block the GUI
-- Exact total count is optional (no expensive pre-scan)
+Confirmed current state: reorder enablement is gated on `list_mode` only — `ui/main_window.py:728` (`set_manual_order_enabled(list_mode)`) and `:729` (`_set_reorder_actions_enabled(list_mode)`). `_current_filters()` is used only for querying, never to gate reorder.
 
-Files: `scanner.py`, `library_service.py`, `scan_worker.py`, `main_window.py`, `tests/test_scan_worker.py`.
+Required: filter active → drag reorder and all four move actions disabled, status shows `名单（已筛选，排序已禁用）`; clearing filters restores them. **Do not build a filtered-subset reorder algorithm** — the review says explicitly not to.
 
-Keep cooperative cancel and batch commits. After finished/cancelled, restore the existing `Library (sorted)` / `List (manual order)` status tip.
+### 6.2 Section 1 — all user-facing UI in Simplified Chinese
 
-Suggested commit: `feat(scan): report scan progress`
+Every menu, action, button, label, dialog, warning, status message, view name, filter option, tooltip and empty state. The review carries a full translation table. **Do not translate** filenames, paths, user-created list names, metadata values, or extension strings such as `.jpg`. Source identifiers, tests and developer docs stay English.
 
-### 6.2 Task 8 — filter UI (review item #8)
+Add tests covering representative Chinese strings, per the review.
 
-Spec: same plan → **Task 8**.
-Review text: `docs/PHASE1_1_REVIEW_FIXES.md` §8.
+### 6.3 Section 3 — packaged-EXE workflow evidence
 
-Required UI (compact, four combos under the sort combo, not heavy):
+The current `docs/verification/phase1_1_windows_smoke.md` proves build + launch + clean close only. It must additionally prove the **packaged EXE** completes the 18-step workflow (the review lists it), and the report must explicitly distinguish packaged-EXE manual smoke from pytest automated smoke. Synthetic media only.
 
-- media type: all / image / video
-- extension
-- source folder
-- missing / present / all
+### 6.4 Section 4 — 1k/10k GUI smoke through the real `MainWindow`
 
-Do **not** add a second Rejected control. All / Unassigned / Rejected views already exist.
+Neither `tests/test_perf_smoke.py` nor `scripts/perf_smoke.py` references `MainWindow` at all — the existing smoke is repository/service level. Add a GUI-level smoke that passes through the real Qt window, model, view and event handling at 1,000 and 10,000 items. Prefer structural assertions (call counts, bounded queues) over timing SLAs.
 
-`source_folder` and `missing: bool | None` must land on `MediaRepository.list_media` / `list_unassigned` and `LibraryService`. Named-list view filters in memory and **must not** write `sort_key`.
+### 6.5 Then section 5 and 8 — regression and the acceptance gate
 
-Suggested commit: `feat(filters): complete phase1 library filters`
-
-Cheap extra while in `MainWindow._on_add_source_folder`: catch `ValueError` from the overlap guard and show a warning dialog, same pattern as New/Open Project. Currently the service raises and the UI does not catch it.
-
-### 6.3 I4 — docs
-
-`ARCHITECTURE.md` still describes old scan signals (`finished`/`failed` only) and old thumbs (`request()` filling visible rows). Update after Tasks 6 and 8 so you only refresh once:
-
-- cooperative cancel, progress, DirectConnection
-- viewport `sync()`, `MAX_PENDING=64`, bounded pixmap cache
-- bulk list membership
-- generic overlap
-- filter combos
-- `_thumb_paths` / no FS work in `_reload_grid`
-
-Update `README.md` only if user-visible steps changed.
-
-`docs/codebase/` was an untracked leftover on one machine. If you see it: refresh or delete; do not “fix in place.” It is not on GitHub.
-
-### 6.4 Task 9 — 1k / 10k perf (review item #12)
-
-Spec: plan Task 9. Sanitized report: `docs/verification/phase1_1_performance.md`.
-Synthetic data only. No real `photos/` inventory in the commit.
-
-C1 is already fixed, so it is now valid to measure. Still: assert call counts / bounded queues, not a single-machine timing SLA.
-
-### 6.5 Task 10 — Windows PyInstaller smoke (review item #11)
-
-Spec: plan Task 10. Report: `docs/verification/phase1_1_windows_smoke.md`.
-Build: `python -m PyInstaller build/local_media_curator.spec`
-EXE: `dist/local_media_curator/local_media_curator.exe`
-Do not commit `dist/` or `build/local_media_curator/`. No personal paths or real photo names in the report.
-
-Phase 1.1 is complete only when `docs/PHASE1_1_REVIEW_FIXES.md` §15 checkboxes can be ticked with evidence.
+Run the full suite on 3.12/3.13, record the exact result, and tick the gate with evidence.
 
 ---
 
@@ -213,7 +172,7 @@ $env:QT_QPA_PLATFORM='offscreen'
 python -m pytest -q
 ```
 
-On the last Grok machine the default interpreter was 3.14.3 and there was no repo `.venv`. Create a 3.12 venv if needed:
+On a machine with the default interpreter 3.14.3 and no repo `.venv`, create a 3.12 venv:
 
 ```text
 py -3.12 -m venv .venv
@@ -222,7 +181,7 @@ $env:QT_QPA_PLATFORM='offscreen'
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Overnight review at `4dc8a17` reported **107 passed, 1 skipped**. This handoff HEAD has more tests (delegate, reload call-count, selection restore, batch scan, overlap, thumb invalidation). Re-run the full suite after Task 6 and after Task 8.
+Expected: **127 passed, 1 skipped.** One warning may appear about `.pytest_cache` being undeletable — an environment artifact, not a code issue.
 
 If a GUI-scan test hangs: prefer `LibraryService.scan()` plus `window.refresh()` for unit tests; `window.scan()` needs the DirectConnection worker and `qtbot.waitUntil` with a finite timeout. Always set `QT_QPA_PLATFORM=offscreen`.
 
@@ -230,53 +189,48 @@ If a GUI-scan test hangs: prefer `LibraryService.scan()` plus `window.refresh()`
 
 ## 8. Known leftovers (do not treat as the next epic)
 
-Do these only when already in the file, or after Task 10:
+Do these only when already in the file, or after the section 1–4 work:
 
 | Id | Note |
 |---|---|
-| Overlap UI | `MainWindow._on_add_source_folder` does not catch `ValueError` |
-| M1 | `ThumbnailPool` `finished.emit` outside `try`; emit into deleted QObject after `deleteLater` |
+| Overlap UI | `MainWindow._on_add_source_folder` does not catch the `ValueError` the overlap guard raises; no warning dialog |
+| M1 | `ThumbnailPool` `finished.emit` outside `try`; can emit into a deleted QObject after `deleteLater` |
 | M2 | `worker.cancelled` not disconnected in `_stop_scan_thread` |
 | M3 | `set_thumbnail_path` linear scan per ready signal |
-| M4 | `pixmap.scaled(SmoothTransformation)` every repaint |
-| M6 | `ListService.create` swallows duplicate names; MainWindow warning is dead |
-| M7 | Home/End bound to move-to-start/end, steal grid nav |
+| M4 | `pixmap.scaled(SmoothTransformation)` on every repaint |
+| M6 | `ListService.create` swallows duplicate names; the MainWindow warning path is dead code |
+| M7 | Home/End bound to move-to-start/end, stealing grid navigation |
 | M8 | `closeEvent` does not close the project connection |
-| Unused | `MainWindow.thumbnail_service` leftover after C1 |
+| Unused | `MainWindow.thumbnail_service` leftover after the C1 fix |
 | `_pending_selection` | shadowed if a live selection exists after reject |
 
 **Dropped — do not spend time:** M9 `keys()` (delete rather than test if you touch the cache), M5 IN-clause chunking for ≤10k, `.pytest_cache` warnings, rewriting `b41099d` history.
 
+`docs/codebase/` is an untracked leftover that exists on one machine only and is not on GitHub. If you see it: refresh or delete; do not “fix in place.”
+
 ---
 
-## 9. Suggested OpenCode process
+## 9. Suggested process
 
 1. One task at a time. TDD: failing test, confirm fail, minimal code, confirm pass, covering tests, commit.
-2. After Task 6: `pytest tests/test_scan_worker.py tests/test_scan_immutability.py tests/test_library_query.py -q`
-3. After Task 8: add `tests/test_lists.py tests/test_main_window.py` and a full `pytest -q`
-4. Do not implement Task 9/10 until 6 and 8 are green.
-5. Push `feat/phase1-mvp` when a task group is done so the user can review on GitHub. Do not open a merge to `main` unless asked.
+2. After section 2: run `tests/test_lists.py`, `tests/test_main_window.py`, `tests/test_library_query.py`, then the full suite.
+3. After section 1: full suite; confirm no non-Chinese user-facing string remains.
+4. Push `feat/phase1-mvp` when a task group is done so the user can review on GitHub. Do not open a merge to `main` unless asked.
 
-Suggested commits (from the original plan):
+Suggested commits (from the final review's §10):
 
 ```text
-feat(scan): report scan progress
-feat(filters): complete phase1 library filters
-docs: refresh architecture after phase 1.1 responsiveness fixes
-test(perf): add 1k and 10k smoke coverage
-docs(verify): record phase1.1 windows smoke
+fix(ui): disable reorder in filtered lists
+feat(i18n): use Chinese user-facing UI strings
+test(ui): cover Chinese strings and filtered reorder lock
+test(perf): add 1k and 10k MainWindow GUI smoke
+docs(verify): update packaged exe and gui performance evidence
 ```
 
 ---
 
 ## 10. Handoff back to the user
 
-When Tasks 6 and 8 (and ideally 9–10) are done, give:
-
-1. branch name and HEAD SHA
-2. `main...feat/phase1-mvp` link
-3. full pytest summary
-4. new/changed files
-5. remaining Phase 2 items (video thumbs, optional playback, list export, JSON/CSV manifest, cancellation already exists, moved-file reconciliation, shortcuts, installer)
+Provide: branch name; final HEAD SHA; `main...feat/phase1-mvp` diff/PR link; exact full pytest summary; commits added; updated packaged-EXE smoke report; updated 1k/10k GUI performance report; explicit confirmation that all user-facing UI is Simplified Chinese; known limitations deferred to Phase 2.
 
 Do not ask the user to infer success from plans.

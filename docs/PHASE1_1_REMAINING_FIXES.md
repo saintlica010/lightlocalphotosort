@@ -1,6 +1,19 @@
-# Phase 1.1 — Remaining Work
+# Phase 1.1 — Overnight Review Record (HISTORICAL)
 
-Status: **`feat/phase1-mvp` is pushed with known open defects. This document is the handoff.**
+> ## ⚠️ This document is a historical record, not a live handoff.
+>
+> It describes the tree at **`7383af3`**, when plan Tasks 6–10 were unimplemented and findings C1, I1, I2, I3, I4 and M10 were open.
+>
+> **Every finding in sections 2, 3 and 5 below has since been fixed.** Sections 0, 2, 3 and 5 are therefore **false about the current tree** — they still claim `paths_overlap` is missing and that `_reload_grid` stats every row.
+>
+> **For current state and current work, read instead:**
+>
+> 1. `docs/PHASE1_1_FINAL_REVIEW.md` — **the live requirements document.** Lists the remaining merge blockers.
+> 2. `docs/OPENCODE_HANDOFF.md` — the live handoff, updated to current HEAD.
+>
+> What is still useful here: the **dropped** list and the **minor leftovers** in section 5, which the final review did not re-triage. This document's own section 5 also carries a status update from an intermediate commit — treat that as historical too.
+
+Status at time of writing: `feat/phase1-mvp` was pushed with known open defects.
 
 Written: 2026-09-17
 Branch: `feat/phase1-mvp`
@@ -54,21 +67,31 @@ Task 5 also fixed a defect it uncovered: the scan had been running **on the GUI 
 
 ---
 
-## 2. What is NOT done
+## 2. What was NOT done at `7383af3` — **since completed**
 
-**Tasks 6–10 of the plan are absent from the tree.** External review items **#8, #9, #10, #11, #12** are therefore unaddressed, and the §15 acceptance gate in `docs/PHASE1_1_REVIEW_FIXES.md` cannot be signed off. Verified directly:
+> This section was accurate when written and is **no longer true**. Kept only so the record is readable.
 
-- `grep -rn "paths_overlap\|reject_overlapping"` → nothing (item #10)
-- `scripts/` contains only `build_windows.ps1` — no `perf_smoke.py` (item #12)
-- no `docs/verification/` — no smoke or performance reports (items #11, #12)
-- `LibraryPanel` has no `type_combo` / `extension_combo` / `folder_combo` (item #8)
-- `scanner.py` has no `progress_cb` (item #9)
+At `7383af3`, plan Tasks 6–10 were absent and external review items #8, #9, #10, #11 and #12 were unaddressed. All five are now implemented:
 
-Tasks 6, 7, 8 and 9 in the plan are written in full, with tests, and can be executed as-is. **Task 7 (item #10) is a real safety gap, not just a missing feature — see I3 below.**
+| Item | What | Commit |
+|---|---|---|
+| #10 | project/source overlap guard | `72795aa` |
+| #9 | scan progress reporting | `64f4b0b` |
+| #8 | library filter UI | `c9d9894` |
+| #12 | 1k/10k perf smoke + report | `47cb85d` |
+| #11 | Windows PyInstaller smoke + report | `6c97b8d` |
+
+Plan Task 7 was also the fix for item #10 and was completed in the same commit.
+
+**The §15 acceptance gate in `docs/PHASE1_1_REVIEW_FIXES.md` still cannot be signed off** — but for different reasons now. See `docs/PHASE1_1_FINAL_REVIEW.md`, which supersedes it.
 
 ---
 
-## 3. Open findings, in the order to fix them
+## 3. Findings at `7383af3` — **all resolved since**
+
+> C1, I1, I2, I3, I4 and M10 are all fixed. See the table in section 5. The write-ups are kept for their measurements and reproduction steps, which remain the evidence for what was wrong.
+
+**Resolved by:** C1 `49299a0` + follow-up `01d9045`; I1 `28c7098`; I2 `5e6d3cc`; I3 `72795aa`; I4 `bc2178e`; M10 `a210e66`.
 
 ### C1 — CRITICAL: `_reload_grid` does O(N) filesystem work on the GUI thread
 
