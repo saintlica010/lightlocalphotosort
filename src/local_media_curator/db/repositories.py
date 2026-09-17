@@ -177,6 +177,8 @@ class MediaRepository:
         sort_by: str = "file_name",
         media_type: str | None = None,
         extension: str | None = None,
+        source_folder: str | None = None,
+        missing: bool | None = None,
     ) -> list[sqlite3.Row]:
         clauses: list[str] = []
         params: list[object] = []
@@ -184,7 +186,7 @@ class MediaRepository:
             clauses.append("rejected = 1")
         elif not include_rejected:
             clauses.append("rejected = 0")
-        self._append_type_filters(clauses, params, media_type, extension)
+        self._append_filters(clauses, params, media_type, extension, source_folder, missing)
         return self._select_media(clauses, params, sort_by)
 
     def list_unassigned(
@@ -193,22 +195,33 @@ class MediaRepository:
         sort_by: str = "file_name",
         media_type: str | None = None,
         extension: str | None = None,
+        source_folder: str | None = None,
+        missing: bool | None = None,
     ) -> list[sqlite3.Row]:
         clauses = [
             "rejected = 0",
             "id NOT IN (SELECT media_id FROM list_items)",
         ]
         params: list[object] = []
-        self._append_type_filters(clauses, params, media_type, extension)
+        self._append_filters(clauses, params, media_type, extension, source_folder, missing)
         return self._select_media(clauses, params, sort_by)
 
-    def _append_type_filters(
+    def _append_filters(
         self,
         clauses: list[str],
         params: list[object],
         media_type: str | None,
         extension: str | None,
+        source_folder: str | None,
+        missing: bool | None,
     ) -> None:
+        if source_folder:
+            prefix = source_folder.rstrip("\\/") + os.sep
+            clauses.append("substr(normalized_path, 1, ?) = ?")
+            params.extend((len(prefix), prefix))
+        if missing is not None:
+            clauses.append("missing = ?")
+            params.append(int(missing))
         if media_type:
             clauses.append("media_type = ?")
             params.append(media_type)

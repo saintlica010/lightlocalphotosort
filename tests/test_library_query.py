@@ -9,6 +9,83 @@ from local_media_curator.ui.library_panel import LibraryPanel
 from local_media_curator.ui.main_window import MainWindow
 
 
+def test_folder_missing_filters_and_list_order(qtbot, tmp_path: Path) -> None:
+    from local_media_curator.domain.paths import normalize_path
+
+    project = create_project(tmp_path / "proj")
+    lib = LibraryService(project)
+    one = tmp_path / "cam_%"
+    two = tmp_path / "cam_%extra"
+    one.mkdir()
+    two.mkdir()
+    Image.new("RGB", (10, 10)).save(one / "A.jpg")
+    Image.new("RGB", (10, 10)).save(one / "B.png")
+    (two / "C.mp4").write_bytes(b"synthetic")
+    lib.add_source_folder(one)
+    lib.add_source_folder(two)
+    lib.scan()
+    (one / "A.jpg").unlink()
+    lib.scan()
+    assert [m.file_name for m in lib.list_media(source_folder=normalize_path(one))] == ["A.jpg", "B.png"]
+    assert [m.file_name for m in lib.list_unassigned(missing=True)] == ["A.jpg"]
+    assert [m.file_name for m in lib.list_media(missing=False)] == ["B.png", "C.mp4"]
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    panel = window.library_panel
+    ids = [m.id for m in lib.list_media()]
+    list_id = window.list_service.create("First")
+    other_id = window.list_service.create("Second")
+    window.add_items_to_list(list_id, ids[::-1])
+    window.add_items_to_list(other_id, ids)
+    before = window.list_service.items_with_sort_keys(list_id)
+    other_before = window.list_service.items_with_sort_keys(other_id)
+
+    def names():
+        return [window.media_grid.model.row_at(i)["file_name"] for i in range(window.media_grid.model.rowCount())]
+
+    for view in ("all", "list"):
+        if view == "list":
+            window.show_list(list_id)
+        else:
+            window.show_library_view(view)
+        panel.type_combo.setCurrentIndex(panel.type_combo.findData("video"))
+        assert names() == ["C.mp4"]
+        panel.type_combo.setCurrentIndex(0)
+        panel.folder_combo.setCurrentIndex(panel.folder_combo.findData(normalize_path(one)))
+        panel.extension_combo.setCurrentIndex(panel.extension_combo.findData(".jpg"))
+        assert names() == ["A.jpg"]
+        panel.missing_combo.setCurrentIndex(panel.missing_combo.findData(False))
+        assert names() == []
+        panel.missing_combo.setCurrentIndex(panel.missing_combo.findData(True))
+        assert names() == ["A.jpg"]
+        panel.extension_combo.setCurrentIndex(0)
+        panel.folder_combo.setCurrentIndex(0)
+        panel.missing_combo.setCurrentIndex(0)
+    assert names() == ["C.mp4", "B.png", "A.jpg"]
+    assert window.list_service.items_with_sort_keys(list_id) == before
+    assert window.list_service.items_with_sort_keys(other_id) == other_before
+    window.close()
+    project.close()
+
+
+def test_add_source_overlap_dialog(qtbot, tmp_path: Path, monkeypatch) -> None:
+    from local_media_curator.ui import main_window as module
+
+    project = create_project(tmp_path / "proj")
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    monkeypatch.setattr(module, "choose_existing_directory", lambda *_: tmp_path)
+    warnings = []
+    monkeypatch.setattr(module.QMessageBox, "warning", lambda *args: warnings.append(args))
+    window._on_add_source_folder()
+    assert len(warnings) == 1
+    assert "overlap" in warnings[0][2].lower()
+    window.close()
+    project.close()
+
+
 def test_remove_source_folder_keeps_media_and_files(tmp_path: Path) -> None:
     project = create_project(tmp_path / "proj")
     source = tmp_path / "src"
