@@ -46,6 +46,7 @@ class MainWindow(QMainWindow):
         self._scan_worker: ScanWorker | None = None
         self._thumb_needed: dict[int, str] = {}
         self._thumb_paths: dict[int, str] = {}
+        self._pending_selection: list[int] = []
 
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.library_panel = LibraryPanel()
@@ -89,6 +90,7 @@ class MainWindow(QMainWindow):
         self._current_list_id = None
         self._sort_by = self.library_panel.current_sort()
         self._thumb_paths = {}
+        self._pending_selection = []
         if previous is not None and previous is not project:
             previous.close()
         self._set_project_actions_enabled(True)
@@ -624,6 +626,7 @@ class MainWindow(QMainWindow):
     def _reload_grid(self) -> None:
         if self.library_service is None:
             self._thumb_needed = {}
+            self._pending_selection = []
             if self.thumbnail_pool is not None:
                 self.thumbnail_pool.clear()
             self.media_grid.model.set_rows([])
@@ -632,9 +635,18 @@ class MainWindow(QMainWindow):
             self._set_reorder_actions_enabled(False)
             self.statusBar().clearMessage()
             return
+        selected = self.media_grid.selected_ids()
+        current = self.media_grid.view.currentIndex()
+        if current.isValid():
+            value = self.media_grid.model.data(current, MediaListModel.IdRole)
+            if value is not None:
+                current_id = int(value)
+                if current_id not in selected:
+                    selected = [*selected, current_id]
         items = self._media_for_current_view()
         list_mode = self._view_mode == "list"
         media_ids = [item.id for item in items]
+        present_ids = set(media_ids)
         names_by_id = (
             self.list_service.list_names_for_media_ids(media_ids)
             if self.list_service is not None
@@ -654,12 +666,16 @@ class MainWindow(QMainWindow):
         self.media_grid.set_manual_order_enabled(list_mode)
         self._set_reorder_actions_enabled(list_mode)
         self._set_order_status(list_mode)
-        current = self.media_grid.view.currentIndex()
-        if current.isValid():
-            self.preview_panel.set_media(self.media_grid.model.row_at(current.row()))
-        else:
-            self.preview_panel.set_media(None)
         self._sync_thumbnails()
+        to_restore = selected if selected else self._pending_selection
+        present = [media_id for media_id in to_restore if media_id in present_ids]
+        if present:
+            self._select_media_ids(present)
+            self._pending_selection = []
+        else:
+            if selected:
+                self._pending_selection = selected
+            self.preview_panel.set_media(None)
 
     def _set_order_status(self, list_mode: bool) -> None:
         if list_mode:
