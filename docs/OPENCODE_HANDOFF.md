@@ -139,7 +139,18 @@ C1 used to freeze the UI ~19 s at 10k rows (O(N) `stat`/`resolve` on the GUI thr
 
 §1 translated every visible string. Note `install_chinese_translations` in `app.py`: Qt's own Yes/No/OK/Cancel come from Qt's catalogue, so the translator must be loaded or those buttons stay English inside a Chinese UI. `tests/test_ui_language.py` asserts representative strings and sweeps all visible text for English UI vocabulary.
 
-Current suite: **149 passed, 1 skipped** on Python 3.12.
+### Final-review sections 3 and 4
+
+| Review section | What | State |
+|---|---|---|
+| §3 | packaged-EXE workflow evidence | **partially done** — build, launch, clean close and content checks pass; the user ran it and the two defects it found (English buttons, English error message) are fixed and rebuilt. Steps 3–18 of the walkthrough are **not yet demonstrated**. |
+| §4 | 1k/10k GUI smoke through `MainWindow` | **done** — `tests/test_perf_gui_smoke.py`, numbers in `docs/verification/phase1_1_performance.md` |
+
+§4 asserts structure rather than timing: a reload issues 4 filesystem calls whether the
+library holds 1,000 rows or 10,000, and at most ceil(n/400) membership statements. Timing
+thresholds were avoided deliberately — their absence is why C1 shipped.
+
+Current suite: **169 passed** on Python 3.12.
 
 ---
 

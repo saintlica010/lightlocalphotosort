@@ -4,9 +4,10 @@ Date: 2026-09-17
 Branch: `feat/phase1-mvp`
 Environment: Windows 10 Pro, Python 3.12.10 (project `.venv`), PySide6 6.11.2, PyInstaller 6.22.3.
 
-> **Status: partially complete.** The build and every automatable check pass. The
-> packaged-EXE manual walkthrough (section 4) has **not** been performed yet and is
-> **not** claimed here. See section 2 for why that distinction is enforced.
+> **Status: the packaged EXE has been run by the user and the defects it exposed are
+> fixed and rebuilt.** See section 3a for what that pass found. The remaining steps of
+> the 18-step walkthrough (section 4) are **partially covered** — the steps marked
+> unconfirmed there have not been demonstrated and are not claimed.
 
 ---
 
@@ -57,7 +58,36 @@ requires the packaged binary itself to complete the workflow.
 
 ---
 
-## 4. Packaged EXE — manual workflow walkthrough (**NOT YET RUN**)
+## 3a. First packaged-EXE pass — what it found
+
+The user ran the built EXE before this section was written. It exposed two real
+defects, both of which the source-tree tests had missed, plus one behaviour that
+was correct but confusing:
+
+1. **Confirmation and warning buttons were English.** The first translation pass
+   relied on Qt's own catalogue, and `QTranslator.load("qt_zh_CN")` returns `True`
+   from the source tree but `False` inside the frozen bundle — with the `.qm` file
+   present and byte-identical. Buttons are now set by our own code in
+   `ui/dialogs.py`, verified in a frozen bundle: `['是', '否']`, `['确定']`.
+2. **The error message was English.** Only the dialog *title* had been translated;
+   the text comes from the exception via `str(exc)`. Messages that reach the user
+   are now Chinese.
+3. **"Project root cannot be inside photos" was correct behaviour, not a bug.** The
+   user picked the photos folder as the *project* location. Creating a project there
+   would put `project.sqlite3`, `thumbnails/` and `logs/` inside the real photo tree,
+   which `AGENTS.md` §14/§17 forbids. The correct flow is: create the project
+   elsewhere, then add the photos folder as a *source folder*.
+
+Also found while changing those messages: four `match=` assertions in the test suite
+were passing for the wrong reason. `pytest`'s `tmp_path` embeds the test name, and
+that path appears in the message, so `match="overlap"` and `match="photos"` were
+matching the fixture directory rather than the behaviour. One was only caught because
+pytest truncates long tmp names and the truncation removed the word. All four now
+match the message text.
+
+Rebuilt after the fixes; the shipped EXE is newer than every source change.
+
+## 4. Packaged EXE — manual workflow walkthrough
 
 Run this against the **built EXE**, not the source tree:
 
@@ -85,6 +115,11 @@ Using `photos/` would work (the scan is read-only) but there is no reason to; th
 synthetic set exists so real personal media stays out of this test.
 
 ### The 18 steps
+
+**Confirmed so far:** step 1 (launch) and the project-creation guard in step 2.
+**Not yet demonstrated on the packaged EXE:** steps 3–18. Do not report this section as
+passed until they have been run against
+`dist/local_media_curator/local_media_curator.exe`.
 
 1. launch the EXE
 2. create a new project — pick `dist/smoke/project/`
@@ -145,7 +180,13 @@ project defect. Pin 3.12 or 3.13.
 
 ## 6. Remaining before this section can be called done
 
-- [ ] run the 18-step walkthrough on the packaged EXE (section 4)
+- [x] build, launch, and automatable checks (sections 1 and 3)
+- [x] first packaged-EXE pass by the user; its findings fixed and rebuilt (section 3a)
+- [x] §4 of `docs/PHASE1_1_FINAL_REVIEW.md` — 1k/10k GUI smoke through `MainWindow`
+      (`tests/test_perf_gui_smoke.py`, numbers in `phase1_1_performance.md`)
+- [ ] run the remaining 18-step walkthrough on the packaged EXE (section 4, steps 3–18)
 - [ ] record the outcome here, including step 17's before/after
-- [ ] confirm the packaged-EXE UI is Chinese (step 18)
-- [ ] §4 of `docs/PHASE1_1_FINAL_REVIEW.md` — 1k/10k GUI smoke through `MainWindow`
+- [ ] confirm the packaged-EXE UI is Chinese end to end (step 18)
+
+The packaged-EXE workflow is the last thing standing between this branch and the
+§8 merge gate in `docs/PHASE1_1_FINAL_REVIEW.md`.
