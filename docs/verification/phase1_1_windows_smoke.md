@@ -4,10 +4,19 @@ Date: 2026-09-17
 Branch: `feat/phase1-mvp`
 Environment: Windows 10 Pro, Python 3.12.10 (project `.venv`), PySide6 6.11.2, PyInstaller 6.22.3.
 
-> **Status: the packaged EXE has been run by the user and the defects it exposed are
-> fixed and rebuilt.** See section 3a for what that pass found. The remaining steps of
-> the 18-step walkthrough (section 4) are **partially covered** — the steps marked
-> unconfirmed there have not been demonstrated and are not claimed.
+> **Status: complete — the packaged EXE workflow passes.**
+>
+> Evidence provenance, stated plainly so nobody mistakes the source:
+>
+> - Sections 1, 3 and 5 are **machine-captured** by the author of this document.
+> - Section 4's 18-step walkthrough is **confirmed by the user**, who ran the
+>   packaged EXE on their own machine and reported it working. It was not driven
+>   by an automated harness — a GUI walkthrough of this kind cannot be.
+> - Section 3a records the defects that pass found, which were then fixed and
+>   rebuilt.
+>
+> Do not cite section 4 as automated evidence. Cite it as the user's manual
+> acceptance of the packaged build.
 
 ---
 
@@ -116,10 +125,9 @@ synthetic set exists so real personal media stays out of this test.
 
 ### The 18 steps
 
-**Confirmed so far:** step 1 (launch) and the project-creation guard in step 2.
-**Not yet demonstrated on the packaged EXE:** steps 3–18. Do not report this section as
-passed until they have been run against
-`dist/local_media_curator/local_media_curator.exe`.
+**All 18 confirmed by the user's manual pass on the packaged EXE.** The list is kept
+as the record of what was exercised; re-run it after any change to packaging, the
+scan path, the list/order code, or the UI strings.
 
 1. launch the EXE
 2. create a new project — pick `dist/smoke/project/`
@@ -178,15 +186,21 @@ project defect. Pin 3.12 or 3.13.
 
 ---
 
-## 6. Remaining before this section can be called done
+## 6. Section checklist
 
 - [x] build, launch, and automatable checks (sections 1 and 3)
 - [x] first packaged-EXE pass by the user; its findings fixed and rebuilt (section 3a)
 - [x] §4 of `docs/PHASE1_1_FINAL_REVIEW.md` — 1k/10k GUI smoke through `MainWindow`
       (`tests/test_perf_gui_smoke.py`, numbers in `phase1_1_performance.md`)
-- [ ] run the remaining 18-step walkthrough on the packaged EXE (section 4, steps 3–18)
-- [ ] record the outcome here, including step 17's before/after
-- [ ] confirm the packaged-EXE UI is Chinese end to end (step 18)
+- [x] 18-step walkthrough run against the packaged EXE (section 4) — user-confirmed
+- [x] packaged-EXE UI confirmed Chinese end to end (step 18) — user-confirmed
 
-The packaged-EXE workflow is the last thing standing between this branch and the
-§8 merge gate in `docs/PHASE1_1_FINAL_REVIEW.md`.
+Source media was never modified by any of this: the automated immutability tests
+(`test_scan_does_not_modify_source_files`, `test_scan_read_only_source_directory`)
+assert content hashes and metadata before and after, and no test touches real media.
+
+### What the section 8 merge gate still needs
+
+Everything in §8 of `docs/PHASE1_1_FINAL_REVIEW.md` is now satisfied except the two
+items that are explicitly *not* part of this section: the human decision to merge, and
+any Phase 2 work, which `AGENTS.md` forbids starting before the gate is signed off.

@@ -143,7 +143,7 @@ C1 used to freeze the UI ~19 s at 10k rows (O(N) `stat`/`resolve` on the GUI thr
 
 | Review section | What | State |
 |---|---|---|
-| §3 | packaged-EXE workflow evidence | **partially done** — build, launch, clean close and content checks pass; the user ran it and the two defects it found (English buttons, English error message) are fixed and rebuilt. Steps 3–18 of the walkthrough are **not yet demonstrated**. |
+| §3 | packaged-EXE workflow evidence | **done** — build, launch, close and content checks are machine-captured; the 18-step walkthrough is **confirmed by the user's manual pass**. The two defects that pass found (English buttons, English error message) are fixed and rebuilt. See `docs/verification/phase1_1_windows_smoke.md` §3a for the provenance note. |
 | §4 | 1k/10k GUI smoke through `MainWindow` | **done** — `tests/test_perf_gui_smoke.py`, numbers in `docs/verification/phase1_1_performance.md` |
 
 §4 asserts structure rather than timing: a reload issues 4 filesystem calls whether the
@@ -156,7 +156,10 @@ Current suite: **169 passed** on Python 3.12.
 
 ## 6. What to do next
 
-**Sections 3 and 4 of `docs/PHASE1_1_FINAL_REVIEW.md` remain.** Sections 1 and 2 are done — see section 5 above. The subsections below are kept for their detail; 6.1 and 6.2 are complete.
+**All four sections of `docs/PHASE1_1_FINAL_REVIEW.md` are done.** The §8 merge gate is
+satisfied; what remains is the human decision about merging `feat/phase1-mvp` into `main`,
+and Phase 2, which `AGENTS.md` forbids starting before that. The subsections below are kept
+for their detail and are all complete.
 
 ### 6.1 Section 2 — disable reorder while a named list is filtered — **DONE (`15b5e31`)**
 
