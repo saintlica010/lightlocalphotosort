@@ -41,6 +41,7 @@ from local_media_curator.ui.dialogs import (
 
 _PORTABLE_LIST_FILTER = "可移植名单 (*.llplist.json)"
 _CSV_FILTER = "CSV (*.csv)"
+_TXT_FILTER = "文本文件 (*.txt)"
 from local_media_curator.ui.library_panel import LibraryPanel
 from local_media_curator.ui.media_grid import MediaGrid
 from local_media_curator.ui.media_model import MediaListModel
@@ -577,6 +578,8 @@ class MainWindow(QMainWindow):
         self.import_list_action.triggered.connect(self._on_import_list)
         self.export_csv_action = QAction("导出 CSV...", self)
         self.export_csv_action.triggered.connect(self._on_export_csv)
+        self.export_txt_action = QAction("导出 TXT...", self)
+        self.export_txt_action.triggered.connect(self._on_export_txt)
         file_menu.addAction(new_project)
         file_menu.addAction(open_project_action)
         file_menu.addSeparator()
@@ -588,6 +591,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.export_list_action)
         file_menu.addAction(self.import_list_action)
         file_menu.addAction(self.export_csv_action)
+        file_menu.addAction(self.export_txt_action)
 
         undo = QAction("撤销", self)
         undo.setShortcut(QKeySequence.StandardKey.Undo)
@@ -728,6 +732,7 @@ class MainWindow(QMainWindow):
         self.export_list_action.setEnabled(enabled)
         self.import_list_action.setEnabled(enabled)
         self.export_csv_action.setEnabled(enabled)
+        self.export_txt_action.setEnabled(enabled)
         for action in (
             getattr(self, "pick_action", None),
             getattr(self, "culling_reject_action", None),
@@ -899,6 +904,26 @@ class MainWindow(QMainWindow):
             return
         try:
             ExportService(self.project).export_csv(list_id, destination)
+        except ValueError as exc:
+            show_warning(self, "无法导出", str(exc))
+
+    def _on_export_txt(self) -> None:
+        if self.project is None:
+            return
+        resolved = self._resolve_export_list("导出 TXT")
+        if resolved is None:
+            return
+        list_id, list_name = resolved
+        destination = choose_save_file(
+            self,
+            "导出 TXT",
+            _TXT_FILTER,
+            default_name=f"{list_name}.txt",
+        )
+        if destination is None:
+            return
+        try:
+            ExportService(self.project).export_txt(list_id, destination)
         except ValueError as exc:
             show_warning(self, "无法导出", str(exc))
 

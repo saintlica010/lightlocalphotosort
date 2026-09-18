@@ -106,6 +106,15 @@ class ExportService:
                 writer.writerow([item.order + 1, item.file_name, item.relative_path])
         return destination
 
+    def export_txt(self, list_id: int, destination: Path) -> Path:
+        document = self._portable_list(list_id)
+        destination = Path(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("w", encoding="utf-8", newline="") as handle:
+            for item in document.items:
+                handle.write(f"{item.file_name}\n")
+        return destination
+
     def _portable_list(self, list_id: int) -> PortableList:
         list_meta = next(
             (row for row in self._lists.all_lists() if int(row["id"]) == list_id),
