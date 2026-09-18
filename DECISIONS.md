@@ -65,3 +65,10 @@ so the rule can hit the matching RAW without a hard-coded camera extension.
 it is not used for the JPEG-to-RAW handoff. The feature stays labeled
 experimental until a real Lightroom import is confirmed. The exporter never
 writes `.lrcat`, XMP, or source media.
+
+## Phase 3D design system
+
+Visual tokens live in one module, `ui/theme.py`. The QSS is generated from
+those tokens. No third-party UI toolkit and no icon font: markers stay the
+existing text glyphs. The prototype is a preview only. Filtering, lists, export,
+and the grid delegate are unchanged until Phase 3E migrates the real surfaces.
