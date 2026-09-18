@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -88,6 +89,24 @@ class ExportService:
         self._sources = SourceFolderRepository(project.connection)
 
     def export_list(self, list_id: int, destination: Path) -> PortableList:
+        document = self._portable_list(list_id)
+        destination = Path(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(to_json(document), encoding="utf-8")
+        return document
+
+    def export_csv(self, list_id: int, destination: Path) -> Path:
+        document = self._portable_list(list_id)
+        destination = Path(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("w", encoding="utf-8-sig", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["order", "file_name", "relative_path"])
+            for item in document.items:
+                writer.writerow([item.order + 1, item.file_name, item.relative_path])
+        return destination
+
+    def _portable_list(self, list_id: int) -> PortableList:
         list_meta = next(
             (row for row in self._lists.all_lists() if int(row["id"]) == list_id),
             None,
@@ -121,11 +140,7 @@ class ExportService:
                 )
             )
 
-        document = PortableList(name=str(list_meta["name"]), items=items)
-        destination = Path(destination)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(to_json(document), encoding="utf-8")
-        return document
+        return PortableList(name=str(list_meta["name"]), items=items)
 
     def match_list(
         self, path: Path, remaps: dict[str, Path] | None = None

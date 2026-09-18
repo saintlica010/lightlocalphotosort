@@ -40,6 +40,7 @@ from local_media_curator.ui.dialogs import (
 )
 
 _PORTABLE_LIST_FILTER = "可移植名单 (*.llplist.json)"
+_CSV_FILTER = "CSV (*.csv)"
 from local_media_curator.ui.library_panel import LibraryPanel
 from local_media_curator.ui.media_grid import MediaGrid
 from local_media_curator.ui.media_model import MediaListModel
@@ -574,6 +575,8 @@ class MainWindow(QMainWindow):
         self.export_list_action.triggered.connect(self._on_export_list)
         self.import_list_action = QAction("导入名单...", self)
         self.import_list_action.triggered.connect(self._on_import_list)
+        self.export_csv_action = QAction("导出 CSV...", self)
+        self.export_csv_action.triggered.connect(self._on_export_csv)
         file_menu.addAction(new_project)
         file_menu.addAction(open_project_action)
         file_menu.addSeparator()
@@ -584,6 +587,7 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(self.export_list_action)
         file_menu.addAction(self.import_list_action)
+        file_menu.addAction(self.export_csv_action)
 
         undo = QAction("撤销", self)
         undo.setShortcut(QKeySequence.StandardKey.Undo)
@@ -723,6 +727,7 @@ class MainWindow(QMainWindow):
         self.scan_action.setEnabled(enabled)
         self.export_list_action.setEnabled(enabled)
         self.import_list_action.setEnabled(enabled)
+        self.export_csv_action.setEnabled(enabled)
         for action in (
             getattr(self, "pick_action", None),
             getattr(self, "culling_reject_action", None),
@@ -824,9 +829,9 @@ class MainWindow(QMainWindow):
     def _on_open_original(self) -> None:
         self.preview_panel.open_original()
 
-    def _on_export_list(self) -> None:
+    def _resolve_export_list(self, title: str) -> tuple[int, str] | None:
         if self.project is None or self.list_service is None:
-            return
+            return None
         list_id = self.list_panel.selected_list_id()
         list_name: str | None = None
         if list_id is not None:
@@ -842,19 +847,28 @@ class MainWindow(QMainWindow):
             rows = self.list_service.all_lists()
             if not rows:
                 show_warning(self, "无法导出", "没有可导出的名单。")
-                return
+                return None
             chosen = choose_list_name(
-                self, [str(row["name"]) for row in rows], title="导出名单"
+                self, [str(row["name"]) for row in rows], title=title
             )
             if not chosen:
-                return
+                return None
             match = next(
                 (row for row in rows if str(row["name"]) == chosen), None
             )
             if match is None:
-                return
+                return None
             list_id = int(match["id"])
             list_name = str(match["name"])
+        return list_id, list_name
+
+    def _on_export_list(self) -> None:
+        if self.project is None:
+            return
+        resolved = self._resolve_export_list("导出名单")
+        if resolved is None:
+            return
+        list_id, list_name = resolved
         destination = choose_save_file(
             self,
             "导出名单",
@@ -865,6 +879,26 @@ class MainWindow(QMainWindow):
             return
         try:
             ExportService(self.project).export_list(list_id, destination)
+        except ValueError as exc:
+            show_warning(self, "无法导出", str(exc))
+
+    def _on_export_csv(self) -> None:
+        if self.project is None:
+            return
+        resolved = self._resolve_export_list("导出 CSV")
+        if resolved is None:
+            return
+        list_id, list_name = resolved
+        destination = choose_save_file(
+            self,
+            "导出 CSV",
+            _CSV_FILTER,
+            default_name=f"{list_name}.csv",
+        )
+        if destination is None:
+            return
+        try:
+            ExportService(self.project).export_csv(list_id, destination)
         except ValueError as exc:
             show_warning(self, "无法导出", str(exc))
 
