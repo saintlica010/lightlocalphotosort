@@ -21,6 +21,7 @@ class MediaListModel(QAbstractListModel):
     RejectedRole = Qt.ItemDataRole.UserRole + 4
     ThumbnailPathRole = Qt.ItemDataRole.UserRole + 5
     CullingStateRole = Qt.ItemDataRole.UserRole + 6
+    QuickSlotsRole = Qt.ItemDataRole.UserRole + 7
     orderChanged = Signal(list, list)
 
     def __init__(
@@ -59,6 +60,9 @@ class MediaListModel(QAbstractListModel):
         if role == self.ThumbnailPathRole:
             path = row.get("thumbnail_path")
             return str(path) if path else None
+        if role == self.QuickSlotsRole:
+            slots = row.get("quick_slots") or []
+            return [int(slot) for slot in slots]
         return None
 
     def roleNames(self):
@@ -68,6 +72,7 @@ class MediaListModel(QAbstractListModel):
         names[self.OrdinalRole] = b"ordinal"
         names[self.RejectedRole] = b"rejected"
         names[self.CullingStateRole] = b"culling_state"
+        names[self.QuickSlotsRole] = b"quick_slots"
         return names
 
     def row_at(self, row: int) -> dict[str, object] | None:

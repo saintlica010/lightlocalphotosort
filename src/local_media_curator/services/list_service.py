@@ -156,12 +156,40 @@ class ListService:
                 self._settings.delete(_quick_slot_key(slot))
 
 
+    def quick_slots_by_list_id(self) -> dict[int, int]:
+        mapping: dict[int, int] = {}
+        for slot in range(1, 10):
+            list_id = self.quick_slot_list_id(slot)
+            if list_id is not None:
+                mapping[list_id] = slot
+        return mapping
+
+    def clear_quick_slot_for_list(self, list_id: int) -> None:
+        for slot in range(1, 10):
+            if self.quick_slot_list_id(slot) == list_id:
+                self.unbind_quick_slot(slot)
+                return
+
+    def quick_slots_for_media_ids(self, media_ids: list[int]) -> dict[int, list[int]]:
+        wanted = {int(media_id) for media_id in media_ids}
+        result = {int(media_id): [] for media_id in media_ids}
+        for slot in range(1, 10):
+            list_id = self.quick_slot_list_id(slot)
+            if list_id is None:
+                continue
+            for media_id in self.ordered_media_ids(list_id):
+                if media_id in wanted:
+                    result[media_id].append(slot)
+        return result
+
     def all_lists(self) -> list[dict[str, object]]:
+        slots = self.quick_slots_by_list_id()
         return [
             {
                 "id": int(row["id"]),
                 "name": str(row["name"]),
                 "description": row["description"],
+                "quick_slot": slots.get(int(row["id"])),
             }
             for row in self._lists.list_all()
         ]

@@ -3,11 +3,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -22,6 +24,9 @@ class ListPanel(QWidget):
     delete_requested = Signal(int)
     current_list_changed = Signal(object)
     set_target_requested = Signal(int)
+    bind_slot_requested = Signal(int, int)
+    unbind_slot_requested = Signal(int)
+    NameRole = Qt.ItemDataRole.UserRole + 1
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -36,6 +41,8 @@ class ListPanel(QWidget):
         self.set_target_button.clicked.connect(self._on_set_target)
         self.lists_widget.currentItemChanged.connect(self._on_current_changed)
         self.lists_widget.itemClicked.connect(self._on_item_clicked)
+        self.lists_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.lists_widget.customContextMenuRequested.connect(self._show_context_menu)
 
         buttons = QHBoxLayout()
         buttons.addWidget(self.new_button)
@@ -62,8 +69,12 @@ class ListPanel(QWidget):
         self.lists_widget.clear()
         restore: QListWidgetItem | None = None
         for row in rows:
-            item = QListWidgetItem(str(row.get("name") or ""))
+            name = str(row.get("name") or "")
+            slot = row.get("quick_slot")
+            label = f"[{int(slot)}] {name}" if slot else name
+            item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, int(row["id"]))
+            item.setData(self.NameRole, name)
             self.lists_widget.addItem(item)
             if current_id is not None and int(row["id"]) == current_id:
                 restore = item
@@ -87,7 +98,8 @@ class ListPanel(QWidget):
         if list_id is None:
             return
         item = self.lists_widget.currentItem()
-        current = item.text() if item is not None else ""
+        stored = item.data(self.NameRole) if item is not None else None
+        current = str(stored) if stored else (item.text() if item is not None else "")
         name = ask_text(self, "重命名名单", "名称：", text=current)
         if name and name.strip():
             self.rename_requested.emit(list_id, name.strip())
@@ -114,3 +126,31 @@ class ListPanel(QWidget):
             return
         value = current.data(Qt.ItemDataRole.UserRole)
         self.current_list_changed.emit(int(value) if value is not None else None)
+
+    def context_menu_for(self, list_id: int) -> QMenu:
+        menu = QMenu(self)
+        bind_menu = menu.addMenu("绑定快捷键")
+        for slot in range(1, 10):
+            action = QAction(str(slot), bind_menu)
+            action.triggered.connect(
+                lambda _checked=False, slot=slot, list_id=list_id: self.bind_slot_requested.emit(
+                    list_id, slot
+                )
+            )
+            bind_menu.addAction(action)
+        clear = QAction("取消快捷键", menu)
+        clear.triggered.connect(
+            lambda _checked=False, list_id=list_id: self.unbind_slot_requested.emit(list_id)
+        )
+        menu.addAction(clear)
+        return menu
+
+    def _show_context_menu(self, pos) -> None:
+        item = self.lists_widget.itemAt(pos)
+        if item is None:
+            return
+        value = item.data(Qt.ItemDataRole.UserRole)
+        if value is None:
+            return
+        self.context_menu_for(int(value)).exec(self.lists_widget.mapToGlobal(pos))
+

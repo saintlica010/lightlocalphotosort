@@ -24,6 +24,28 @@ def culling_marker(value: object) -> str | None:
     return {"picked": "✓", "rejected": "×"}.get(str(value))
 
 
+def quick_slot_badge(value: object) -> str | None:
+    """Visual projection of quick-slot membership, e.g. '1 3 7'."""
+    if value is None:
+        return None
+    numbers: list[int] = []
+    raw = value.split() if isinstance(value, str) else value
+    try:
+        items = list(raw)
+    except TypeError:
+        return None
+    for item in items:
+        try:
+            number = int(item)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= number <= 9 and number not in numbers:
+            numbers.append(number)
+    if not numbers:
+        return None
+    return " ".join(str(number) for number in sorted(numbers))
+
+
 class ThumbnailDelegate(QStyledItemDelegate):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -85,21 +107,38 @@ class ThumbnailDelegate(QStyledItemDelegate):
             )
 
         name = index.data(MediaListModel.FileNameRole)
-        if name:
+        badge = quick_slot_badge(index.data(MediaListModel.QuickSlotsRole))
+        if name or badge:
             text_rect = QRect(
                 option.rect.left() + 4,
                 thumb_rect.bottom() + 4,
                 option.rect.width() - 8,
                 max(option.rect.bottom() - thumb_rect.bottom() - 4, 16),
             )
-            painter.setPen(
-                option.palette.highlightedText().color() if selected else QColor("#dddddd")
-            )
-            painter.drawText(
-                text_rect,
-                int(Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextWordWrap),
-                str(name),
-            )
+            if badge:
+                badge_width = painter.fontMetrics().horizontalAdvance(badge) + 4
+                badge_rect = QRect(
+                    text_rect.right() - badge_width + 1,
+                    text_rect.top(),
+                    badge_width,
+                    min(18, text_rect.height()),
+                )
+                painter.setPen(QColor("#f2d27a"))
+                painter.drawText(
+                    badge_rect,
+                    int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
+                    badge,
+                )
+                text_rect.setWidth(max(0, text_rect.width() - badge_width - 4))
+            if name:
+                painter.setPen(
+                    option.palette.highlightedText().color() if selected else QColor("#dddddd")
+                )
+                painter.drawText(
+                    text_rect,
+                    int(Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextWordWrap),
+                    str(name),
+                )
         painter.restore()
 
     def sizeHint(self, option, index) -> QSize:

@@ -83,6 +83,9 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.library_panel = LibraryPanel()
         self.list_panel = self.library_panel.list_panel
+        self.confirm_quick_rebind = None
+        self.list_panel.bind_slot_requested.connect(self._on_bind_quick_slot)
+        self.list_panel.unbind_slot_requested.connect(self._on_clear_quick_slot)
         self.media_grid = MediaGrid()
         self.preview_panel = PreviewPanel()
         self.target_list_label = self.list_panel.target_label
@@ -293,6 +296,62 @@ class MainWindow(QMainWindow):
             return
         list_id = self.list_service.ensure_quick_slot(slot)
         self.add_items_to_list(list_id, media_ids)
+
+    def add_selection_to_quick_slot_and_advance(self, slot: int) -> None:
+        if not self._curation_shortcut_allowed():
+            return
+        if self.list_service is None or self.undo_stack is None:
+            return
+        media_ids = self.media_grid.selected_ids()
+        if not media_ids:
+            return
+        visible_ids = self._visible_media_ids()
+        advance_to = self._next_visible_id(visible_ids, media_ids)
+        list_id = self.list_service.ensure_quick_slot(slot)
+        existing = set(self.list_service.ordered_media_ids(list_id))
+        missing = [media_id for media_id in media_ids if media_id not in existing]
+        if missing and not self._run_curation(
+            lambda: self.undo_stack.add_items(list_id, missing)
+        ):
+            return
+        self._refresh_after_curation(advance_to)
+
+    def _on_bind_quick_slot(self, list_id: int, slot: int) -> None:
+        if self.list_service is None:
+            return
+        current = self.list_service.quick_slot_list_id(slot)
+        if current == list_id:
+            return
+        if current is not None:
+            text = (
+                f"快捷键 {slot} 当前绑定到：\n"
+                f"{self._list_name(current)}\n\n"
+                f"是否改为：\n"
+                f"{self._list_name(list_id)}"
+            )
+            confirmed = (
+                self.confirm_quick_rebind(text)
+                if self.confirm_quick_rebind is not None
+                else ask_confirm(self, "绑定快捷键", text)
+            )
+            if not confirmed:
+                return
+        self.list_service.bind_quick_slot(slot, list_id)
+        self.refresh()
+
+    def _on_clear_quick_slot(self, list_id: int) -> None:
+        if self.list_service is None:
+            return
+        self.list_service.clear_quick_slot_for_list(list_id)
+        self.refresh()
+
+    def _list_name(self, list_id: int) -> str:
+        if self.list_service is None:
+            return ""
+        for row in self.list_service.all_lists():
+            if int(row["id"]) == list_id:
+                return str(row["name"])
+        return ""
 
     def move_selection(self, delta: int) -> None:
         if (
@@ -750,16 +809,26 @@ class MainWindow(QMainWindow):
             edit_menu.addAction(action)
             self.media_grid.view.addAction(action)
 
-        # 3A binds number keys to persistent slots, not the menu or badges.
         self.quick_slot_actions = []
+        self.quick_slot_shift_actions = []
         for slot in range(1, 10):
             action = QAction(f"添加到快捷名单 {slot}", self)
             action.setShortcut(QKeySequence(str(slot)))
             action.triggered.connect(
                 lambda _checked=False, slot=slot: self.add_selection_to_quick_slot(slot)
             )
-            self.addAction(action)
+            shift = QAction(f"添加到快捷名单并前进 {slot}", self)
+            shift.setShortcut(QKeySequence(f"Shift+{slot}"))
+            shift.triggered.connect(
+                lambda _checked=False, slot=slot: self.add_selection_to_quick_slot_and_advance(
+                    slot
+                )
+            )
+            for item in (action, shift):
+                self.addAction(item)
+                edit_menu.addAction(item)
             self.quick_slot_actions.append(action)
+            self.quick_slot_shift_actions.append(shift)
 
     def _set_project_actions_enabled(self, enabled: bool) -> None:
         self.add_source_action.setEnabled(enabled)
@@ -786,6 +855,8 @@ class MainWindow(QMainWindow):
             if action is not None:
                 action.setEnabled(enabled)
         for action in getattr(self, "quick_slot_actions", ()):
+            action.setEnabled(enabled)
+        for action in getattr(self, "quick_slot_shift_actions", ()):
             action.setEnabled(enabled)
 
     def _set_reorder_actions_enabled(self, enabled: bool) -> None:
@@ -1247,11 +1318,17 @@ class MainWindow(QMainWindow):
             if self.list_service is not None
             else {}
         )
+        slots_by_id = (
+            self.list_service.quick_slots_for_media_ids(media_ids)
+            if self.list_service is not None
+            else {}
+        )
         rows = [
             self._row_from_media(
                 item,
                 ordinal if list_mode else None,
                 names_by_id.get(item.id, []),
+                slots_by_id.get(item.id, []),
             )
             for ordinal, item in enumerate(items, start=1)
         ]
@@ -1346,7 +1423,11 @@ class MainWindow(QMainWindow):
         )
 
     def _row_from_media(
-        self, media: Media, ordinal: int | None, lists: list[str]
+        self,
+        media: Media,
+        ordinal: int | None,
+        lists: list[str],
+        quick_slots: list[int] | None = None,
     ) -> dict[str, object]:
         return {
             "id": media.id,
@@ -1362,6 +1443,7 @@ class MainWindow(QMainWindow):
             "captured_at": media.captured_at,
             "modified_at": media.modified_at,
             "lists": lists,
+            "quick_slots": list(quick_slots or []),
         }
 
     def _replace_thumbnail_pool(self, project: Project) -> None:
