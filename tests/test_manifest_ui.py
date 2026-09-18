@@ -135,6 +135,84 @@ def test_import_ui_relocates_source_root(qtbot, tmp_path: Path, monkeypatch) -> 
     new_project.close()
 
 
+def test_import_ambiguous_source_opens_remap_dialog(
+    qtbot, tmp_path: Path, monkeypatch
+) -> None:
+    import os
+
+    project = create_project(tmp_path / "proj")
+    folder_a = tmp_path / "folder-a"
+    folder_b = tmp_path / "folder-b"
+    _fill(folder_a / "2026", ("DUP.jpg",))
+    _fill(folder_b / "2026", ("DUP.jpg",))
+    fixed_mtime = 1788000000.0
+    os.utime(folder_a / "2026" / "DUP.jpg", (fixed_mtime, fixed_mtime))
+    os.utime(folder_b / "2026" / "DUP.jpg", (fixed_mtime, fixed_mtime))
+    library = LibraryService(project)
+    library.add_source_folder(folder_a)
+    library.add_source_folder(folder_b)
+    library.scan()
+    size = (folder_a / "2026" / "DUP.jpg").stat().st_size
+    modified = project.connection.execute(
+        "SELECT modified_at FROM media LIMIT 1"
+    ).fetchone()[0]
+    dest = tmp_path / "Dup.llplist.json"
+    dest.write_text(
+        "{\n"
+        '  "format": "light-local-photo-list",\n'
+        '  "version": 1,\n'
+        '  "list": {"name": "Dup"},\n'
+        '  "items": [{\n'
+        '    "order": 0,\n'
+        '    "source": "old-drive",\n'
+        '    "relative_path": "2026/DUP.jpg",\n'
+        '    "file_name": "DUP.jpg",\n'
+        f'    "file_size": {size},\n'
+        f'    "modified_at": "{modified}"\n'
+        "  }]\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    asked_sources: list[str] = []
+    summaries: list[dict] = []
+
+    def fake_choose_dir(parent, title):
+        asked_sources.append(title)
+        return folder_a
+
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.choose_open_file",
+        lambda *args, **kwargs: dest,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.choose_existing_directory",
+        fake_choose_dir,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.show_import_summary",
+        lambda *args, **kwargs: summaries.append(kwargs),
+    )
+    window.import_list_action.trigger()
+    assert asked_sources == ["为源 old-drive 选择新根目录"]
+    assert summaries == [{"matched": 1, "missing": 0, "ambiguous": 0}]
+    dup = next(
+        row for row in ListService(project).all_lists() if row["name"] == "Dup"
+    )
+    imported = ListService(project).ordered_media_ids(int(dup["id"]))
+    expected = [
+        int(row["id"])
+        for row in project.connection.execute(
+            "SELECT id FROM media WHERE absolute_path LIKE '%folder-a%'"
+        )
+    ]
+    assert imported == expected
+    project.close()
+
+
 def test_import_ui_cancel_remap_preserves_existing_list(
     qtbot, tmp_path: Path, monkeypatch
 ) -> None:

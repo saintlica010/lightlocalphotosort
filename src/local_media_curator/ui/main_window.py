@@ -1033,8 +1033,7 @@ class MainWindow(QMainWindow):
             missing=len(result.missing),
             ambiguous=len(result.ambiguous),
         )
-        if result.matched > 0 or result.list_id:
-            self.refresh()
+        self.refresh()
 
     def _on_undo(self) -> None:
         if self.undo_stack is None:
