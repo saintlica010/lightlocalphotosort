@@ -45,6 +45,37 @@ def test_manifest_round_trip(tmp_path: Path) -> None:
     reopened.close()
 
 
+def test_remap_source_label_matches_case_insensitively(tmp_path: Path) -> None:
+    old_project = create_project(tmp_path / "old")
+    old_root = tmp_path / "D-Photos"
+    _fill(old_root / "2026", ("A.jpg",))
+    LibraryService(old_project).add_source_folder(old_root)
+    LibraryService(old_project).scan()
+    lists = ListService(old_project)
+    list_id = lists.create("Website")
+    media_id = old_project.connection.execute(
+        "SELECT id FROM media WHERE file_name = 'A.jpg'"
+    ).fetchone()[0]
+    lists.add_items(list_id, [int(media_id)])
+    dest = tmp_path / "website.llplist.json"
+    ExportService(old_project).export_list(list_id, dest)
+    old_project.close()
+
+    new_root = tmp_path / "E-Photos"
+    (new_root / "2026").mkdir(parents=True)
+    Image.new("RGB", (64, 64), "blue").save(new_root / "2026" / "A.jpg", "JPEG")
+    new_project = create_project(tmp_path / "new")
+    LibraryService(new_project).add_source_folder(new_root)
+    LibraryService(new_project).scan()
+    result = ExportService(new_project).import_list(
+        dest, remaps={"D-Photos": new_root}
+    )
+    assert result.matched == 1
+    assert result.missing == []
+    assert result.ambiguous == []
+    new_project.close()
+
+
 def test_manifest_import_after_source_root_change(tmp_path: Path) -> None:
     old_project = create_project(tmp_path / "old")
     old_root = tmp_path / "D-Photos"

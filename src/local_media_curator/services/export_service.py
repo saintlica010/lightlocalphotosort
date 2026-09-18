@@ -179,7 +179,11 @@ class ExportService:
     ) -> MatchResult:
         """Match manifest items to media ids without writing lists or list_items."""
         document = from_json(Path(path).read_text(encoding="utf-8"))
-        remaps = remaps or {}
+        # Source labels derive from normalized (lowercased on Windows) paths,
+        # so match user-supplied remap keys case-insensitively.
+        remaps = {
+            str(label).lower(): root for label, root in (remaps or {}).items()
+        }
 
         folder_paths = [str(row["path"]) for row in self._sources.list_enabled()]
         labels = source_labels(folder_paths)
@@ -234,7 +238,7 @@ class ExportService:
                 return int(candidate["id"])
 
         # Level 2: user-provided remapped root for this source label.
-        remap_root = remaps.get(item.source)
+        remap_root = remaps.get(item.source.lower())
         if remap_root is not None:
             candidate = self._media.get_by_normalized_path(
                 normalize_path(Path(remap_root) / Path(item.relative_path))
