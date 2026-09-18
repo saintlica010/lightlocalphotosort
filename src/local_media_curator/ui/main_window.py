@@ -580,6 +580,16 @@ class MainWindow(QMainWindow):
         self.export_csv_action.triggered.connect(self._on_export_csv)
         self.export_txt_action = QAction("导出 TXT...", self)
         self.export_txt_action.triggered.connect(self._on_export_txt)
+        self.copy_file_names_action = QAction("复制文件名", self)
+        self.copy_file_names_action.triggered.connect(self._on_copy_file_names)
+        self.copy_absolute_paths_action = QAction("复制绝对路径", self)
+        self.copy_absolute_paths_action.triggered.connect(
+            self._on_copy_absolute_paths
+        )
+        self.copy_relative_paths_action = QAction("复制相对路径", self)
+        self.copy_relative_paths_action.triggered.connect(
+            self._on_copy_relative_paths
+        )
         file_menu.addAction(new_project)
         file_menu.addAction(open_project_action)
         file_menu.addSeparator()
@@ -592,6 +602,10 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.import_list_action)
         file_menu.addAction(self.export_csv_action)
         file_menu.addAction(self.export_txt_action)
+        file_menu.addSeparator()
+        file_menu.addAction(self.copy_file_names_action)
+        file_menu.addAction(self.copy_absolute_paths_action)
+        file_menu.addAction(self.copy_relative_paths_action)
 
         undo = QAction("撤销", self)
         undo.setShortcut(QKeySequence.StandardKey.Undo)
@@ -733,6 +747,9 @@ class MainWindow(QMainWindow):
         self.import_list_action.setEnabled(enabled)
         self.export_csv_action.setEnabled(enabled)
         self.export_txt_action.setEnabled(enabled)
+        self.copy_file_names_action.setEnabled(enabled)
+        self.copy_absolute_paths_action.setEnabled(enabled)
+        self.copy_relative_paths_action.setEnabled(enabled)
         for action in (
             getattr(self, "pick_action", None),
             getattr(self, "culling_reject_action", None),
@@ -834,7 +851,9 @@ class MainWindow(QMainWindow):
     def _on_open_original(self) -> None:
         self.preview_panel.open_original()
 
-    def _resolve_export_list(self, title: str) -> tuple[int, str] | None:
+    def _resolve_export_list(
+        self, title: str, action: str = "导出"
+    ) -> tuple[int, str] | None:
         if self.project is None or self.list_service is None:
             return None
         list_id = self.list_panel.selected_list_id()
@@ -851,7 +870,7 @@ class MainWindow(QMainWindow):
         if list_id is None or list_name is None:
             rows = self.list_service.all_lists()
             if not rows:
-                show_warning(self, "无法导出", "没有可导出的名单。")
+                show_warning(self, f"无法{action}", f"没有可{action}的名单。")
                 return None
             chosen = choose_list_name(
                 self, [str(row["name"]) for row in rows], title=title
@@ -926,6 +945,35 @@ class MainWindow(QMainWindow):
             ExportService(self.project).export_txt(list_id, destination)
         except ValueError as exc:
             show_warning(self, "无法导出", str(exc))
+
+    def _copy_list_text(self, title: str, builder: Callable[[object, int], str]) -> None:
+        if self.project is None:
+            return
+        resolved = self._resolve_export_list(title, action="复制")
+        if resolved is None:
+            return
+        list_id, _name = resolved
+        try:
+            text = builder(ExportService(self.project), list_id)
+        except ValueError as exc:
+            show_warning(self, "无法复制", str(exc))
+            return
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(text)
+
+    def _on_copy_file_names(self) -> None:
+        self._copy_list_text("复制文件名", ExportService.clipboard_file_names)
+
+    def _on_copy_absolute_paths(self) -> None:
+        self._copy_list_text(
+            "复制绝对路径", ExportService.clipboard_absolute_paths
+        )
+
+    def _on_copy_relative_paths(self) -> None:
+        self._copy_list_text(
+            "复制相对路径", ExportService.clipboard_relative_paths
+        )
 
     def _on_import_list(self) -> None:
         if self.project is None:

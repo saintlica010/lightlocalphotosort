@@ -115,6 +115,29 @@ class ExportService:
                 handle.write(f"{item.file_name}\n")
         return destination
 
+    def clipboard_file_names(self, list_id: int) -> str:
+        return "\n".join(
+            str(row["file_name"]) for row in self._ordered_rows(list_id)
+        )
+
+    def clipboard_absolute_paths(self, list_id: int) -> str:
+        return "\n".join(
+            str(row["absolute_path"]) for row in self._ordered_rows(list_id)
+        )
+
+    def clipboard_relative_paths(self, list_id: int) -> str:
+        return "\n".join(
+            item.relative_path for item in self._portable_list(list_id).items
+        )
+
+    def _ordered_rows(self, list_id: int) -> list:
+        if next(
+            (row for row in self._lists.all_lists() if int(row["id"]) == list_id),
+            None,
+        ) is None:
+            raise ValueError("名单不存在。")
+        return self._media.get_by_ids(self._lists.ordered_media_ids(list_id))
+
     def _portable_list(self, list_id: int) -> PortableList:
         list_meta = next(
             (row for row in self._lists.all_lists() if int(row["id"]) == list_id),
