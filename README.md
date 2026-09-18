@@ -6,7 +6,7 @@ This is **not** a general-purpose DAM. Processing stays on the machine. Source m
 
 ## Status
 
-Phase 1 MVP is usable on Windows 10/11: create or open a project, add a source folder, scan, maintain virtual lists, reject/restore, and undo.
+Phase 1 MVP plus Phase 2 keyboard-first culling and portable lists on Windows 10/11: create or open a project, add a source folder, scan, cull with P/X/U, assign to a Target List with B, maintain virtual lists, and export lists as `.llplist.json`, CSV, TXT, or clipboard text.
 
 Stack: Python 3.12+, PySide6, SQLite, Pillow. Windows packaging is a one-folder PyInstaller build.
 
@@ -26,8 +26,9 @@ python -m local_media_curator
 
 1. **New Project** or **Open Project** — choose a folder that is not inside `photos/`, `phototakeplan/`, or `lightphotosprt/`. A source folder that would overlap the project folder is rejected with a warning.
 2. **Add Source Folder**, then **Scan** (F5). The status bar shows `Scanning... {n:,} files processed` while working. Source files are never moved, renamed, or rewritten.
-3. Browse All / Unassigned / Rejected, or create named virtual lists. Filter the grid with the four combos (type, extension, source folder, missing/present); filtering never rewrites a list's manual order.
-4. **Add to List** (from All Media, pick a list), reject/restore, reorder a named list with `[` / `]` or Ctrl+Up/Down, and undo.
+3. Browse All / Unassigned / Picked / Undecided / Rejected, or create named virtual lists. Filter the grid with the four combos (type, extension, source folder, missing/present); filtering never rewrites a list's manual order.
+4. Cull keyboard-first: `P` picked, `X` rejected, `U` undecided (`Shift` variants advance); set a Target List and press `B` to toggle membership (`Shift+B` adds and advances). Reorder a named list with `[` / `]` or Ctrl+Up/Down, and undo.
+5. Export a list without touching source files: **导出名单...** (`.llplist.json`, exact order round-trip across machines), **导出 CSV...**, **导出 TXT...**, or **复制文件名** / **复制绝对路径** / **复制相对路径**. Import with **导入名单...**; missing and ambiguous items are reported, never silently matched.
 
 ## Packaged Windows build
 

@@ -88,6 +88,17 @@ view order before refresh and restores only the next still-visible media ID.
 Text-editor and editable combo-box focus suppresses all single-letter curation
 actions.
 
+## Portable lists and interop export
+
+Phase 2 export means list/manifest export. Source photo bytes are never copied, moved, or rewritten by any export path.
+
+- `domain/portable_list.py` is the pure document: `FORMAT = "light-local-photo-list"`, `VERSION = 1`, `PortableItem(order, source, relative_path, file_name, file_size, modified_at)` with 0-based `order` and POSIX `relative_path`. `to_json` / `from_json` round-trip it; `from_json` raises Chinese `ValueError` on bad format/version/fields.
+- `ExportService` builds every export from one private `_portable_list(list_id)` (current manual order, unique source labels, owning-source prefix match), so JSON/CSV/TXT/clipboard cannot disagree about identity. Missing lists raise `ValueError("名单不存在。")`.
+- `.llplist.json` (`export_list`) keeps the 0-based `order`. Import is match-then-persist: `match_list` layers exact source+relative path, user remap root, then file_name+size+mtime candidates (zero → missing, two or more → ambiguous, never auto-picked), and only then does `import_list` create/replace the named list via `ListService.replace_items`.
+- CSV (`export_csv`) writes 1-based `order,file_name,relative_path` with stdlib `csv`, UTF-8 with BOM for Excel. TXT (`export_txt`) writes one `file_name` per line (`\n`, UTF-8, no header).
+- Clipboard builders (`clipboard_file_names` / `clipboard_absolute_paths` / `clipboard_relative_paths`) return plain `\n`-joined strings in manual order; only the widget touches `QApplication.clipboard()`.
+- Import UI confirms before replacing a same-named non-empty list (`ask_confirm`, default No) and aborts the whole import — with a `已取消导入` status line — if any source-remap dialog is cancelled, so partial matches never wipe a list.
+
 ## Undo
 
 `CurationUndoStack` wraps Qt's undo stack. Undoable actions: add to list, remove from list, reorder, and single/bulk culling-state changes. A bulk state change is one undo command, and restoring mixed prior states is transactional. Undo changes project database state only. It never rewrites source media bytes or metadata.

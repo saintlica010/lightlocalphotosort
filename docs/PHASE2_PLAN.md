@@ -712,35 +712,35 @@ The final packaged Windows build must manually verify at least:
 
 Phase 2 may merge to `main` only when all items below are satisfied:
 
-- [ ] Schema v1 → v2 migration has no data loss
-- [ ] Picked / Undecided / Rejected model is correct
-- [ ] P / X / U work correctly
-- [ ] Shift + P/X/U work correctly
-- [ ] Multi-selection culling works correctly
-- [ ] Bulk culling is one Undo unit
-- [ ] Target List works
-- [ ] Target List persists
-- [ ] B / Shift+B work correctly
-- [ ] Text-entry focus prevents shortcut misfires
-- [ ] Culling filters are correct
-- [ ] State counts are correct
-- [ ] Thumbnail overlays are correct
-- [ ] JSON manifest export works
-- [ ] JSON manifest import works
-- [ ] Manual list order round-trips exactly
-- [ ] Source root can be remapped
-- [ ] Missing items are reported
-- [ ] Ambiguous items are never silently auto-matched
-- [ ] CSV export works
-- [ ] TXT export works
-- [ ] Clipboard export works
-- [ ] Full Phase 1 regression suite passes
-- [ ] 1k / 10k GUI performance has no meaningful regression
-- [ ] Source-media immutability still holds
-- [ ] Protected data is absent from Git
-- [ ] Protected data is absent from packaged build
-- [ ] Windows packaged-EXE smoke passes
-- [ ] All new user-facing UI is Simplified Chinese
+- [x] Schema v1 → v2 migration has no data loss
+- [x] Picked / Undecided / Rejected model is correct
+- [x] P / X / U work correctly
+- [x] Shift + P/X/U work correctly
+- [x] Multi-selection culling works correctly
+- [x] Bulk culling is one Undo unit
+- [x] Target List works
+- [x] Target List persists
+- [x] B / Shift+B work correctly
+- [x] Text-entry focus prevents shortcut misfires
+- [x] Culling filters are correct
+- [x] State counts are correct
+- [x] Thumbnail overlays are correct
+- [x] JSON manifest export works
+- [x] JSON manifest import works
+- [x] Manual list order round-trips exactly
+- [x] Source root can be remapped
+- [x] Missing items are reported
+- [x] Ambiguous items are never silently auto-matched
+- [x] CSV export works
+- [x] TXT export works
+- [x] Clipboard export works
+- [x] Full Phase 1 regression suite passes
+- [x] 1k / 10k GUI performance has no meaningful regression
+- [x] Source-media immutability still holds
+- [x] Protected data is absent from Git
+- [x] Protected data is absent from packaged build
+- [x] Windows packaged-EXE smoke passes
+- [x] All new user-facing UI is Simplified Chinese
 - [ ] Independent review is complete
 
 ---
