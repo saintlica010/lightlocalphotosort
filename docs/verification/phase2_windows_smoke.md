@@ -1,36 +1,47 @@
-# Phase 2D Windows Verification Smoke
+# Phase 2 Windows Verification Smoke
 
 Date: 2026-09-18
 Environment: Windows, Python 3.12.13 project venv, PyInstaller 6.22.3, offscreen Qt.
-Branch: `codex/phase2-1`. No real `photos/` used anywhere below; all fixtures are
-generated JPEGs under pytest `tmp_path`.
+Branch: `codex/phase2-1`, HEAD `7b8726a`. No real `photos/` used anywhere below;
+all fixtures are generated JPEGs under pytest `tmp_path`.
 
-## 1. Full regression suite
+This file separates two evidence kinds. **Automated evidence** (§1–§3) was
+machine-captured by the agent. **Manual packaged-EXE evidence** (§4) is a
+24-step checklist for a human run of the frozen EXE; boxes stay unchecked
+until a human actually clicks through them.
+
+---
+
+## A. Automated evidence (agent, machine-captured)
+
+### A1. Full regression suite
 
 ```text
 $env:QT_QPA_PLATFORM='offscreen'; python -m pytest -q
-225 passed, 1 skipped
+229 passed
 ```
 
 Covers Phase 1 (ordering, undo, scan progress/cancel, immutability), 2A/2B
 (culling, Target List, focus safety), 2C (JSON round-trip, remap, missing /
 ambiguous), and 2D (CSV, TXT, three clipboard builders, import confirm /
-remap-cancel polish, Chinese UI).
+remap-cancel polish, ambiguous-remap dialog, All-view invariant, Chinese UI).
 
-Real bug found by this test during development (not a flake):
-`test_manifest_import_after_source_root_change` failed ~2/6 full-suite runs with
-`matched == 0`. Root cause: source labels derive from normalized source paths,
-which are lowercased on Windows (`d-photos`), while the test's remap dict used
-the natural-case folder name (`D-Photos`). The Level 2 lookup was
-case-sensitive, so it missed; the test then passed only when old and new JPEG
-batches happened to share a wall-clock second (Level 3 mtime rescue).
-Fixed in `fix(import): match remap roots case-insensitively` — `match_list`
-lowercases remap keys once, Level 2 compares `item.source.lower()` — plus a
-deterministic regression test
-(`test_remap_source_label_matches_case_insensitively`, different file sizes so
-Level 3 cannot rescue). Full suite green 4+ consecutive runs after the fix.
+Fixes landed after the 2D closeout, both covered:
 
-## 2. Performance smokes (existing, unweakened)
+- `fix(library): All view contains all culling states` — the 全部 view now
+  returns picked + undecided + rejected (`include_rejected=True` instead of
+  the Phase 1 `culling_state != 'rejected'` fallthrough). New test
+  `test_all_view_contains_all_culling_states`; four Phase 1-era tests that
+  encoded “reject hides from All” were updated to the new semantics
+  (`test_session.py`, `test_main_window.py`, `test_phase1_1_smoke.py`).
+- `fix(import): match remap roots case-insensitively` — real bug, not a
+  flake: source labels derive from normalized (lowercased on Windows) paths,
+  so a natural-case remap key missed Level 2 and the relocation test passed
+  only on same-second mtimes. Remap keys are lowercased once in `match_list`;
+  regression test `test_remap_source_label_matches_case_insensitively` uses
+  different file sizes so Level 3 cannot rescue it.
+
+### A2. Performance smokes (existing, unweakened)
 
 ```text
 python -m pytest tests/test_perf_gui_smoke.py tests/test_perf_smoke.py -q
@@ -40,9 +51,9 @@ python -m pytest tests/test_perf_gui_smoke.py tests/test_perf_smoke.py -q
 1k/10k GUI smoke through the real `MainWindow` plus DB/scheduling helpers.
 No new timing SLAs; no meaningful regression.
 
-## 3. Packaged EXE
+### A3. Packaged EXE build + launch (machine)
 
-Build (worktree root):
+Build (worktree root, HEAD `7b8726a`):
 
 ```text
 python -m pip install -e ".[packaging]"
@@ -65,12 +76,61 @@ Launch check:
 - Closed via `CloseMainWindow()`: yes; exit code 0.
 - stdout/stderr: empty, no traceback.
 
-Honest scope: this proves the frozen app starts and exits cleanly. It is not
-a full 24-step GUI walkthrough of `docs/PHASE2_PLAN.md` §18 (P/X/U, B,
-JSON/CSV/TXT/clipboard, remap dialogs) — those paths are covered by the
-automated UI tests above, not by a human clicking the EXE.
+Scope: this proves the frozen app starts and exits cleanly. It does **not**
+replace the manual walkthrough in §B.
 
-## 4. Docs updated in this closeout
+---
+
+## B. Manual packaged-EXE evidence (human, §18 walkthrough)
+
+Run `dist/local_media_curator/local_media_curator.exe`. Use a temp project
+and generated JPEGs — never the real `photos/` tree. Work through all 24
+steps of `docs/PHASE2_PLAN.md` §18 and check each box only after seeing it
+with your own eyes:
+
+Migration and project:
+
+- [ ] B1. open an existing Phase 1 project
+- [ ] B2. schema migration succeeds
+- [ ] B3. existing lists remain
+- [ ] B4. existing manual list order remains
+- [ ] B5. previous rejected items migrate correctly
+
+Keyboard culling:
+
+- [ ] B6. P works
+- [ ] B7. X works
+- [ ] B8. U works
+- [ ] B9. Shift+P/X/U work
+- [ ] B10. Target List works
+- [ ] B11. B works
+- [ ] B12. Shift+B works
+- [ ] B13. Undo / Redo works
+- [ ] B14. typing in input dialogs does not trigger shortcuts
+
+Filters, counts, lists:
+
+- [ ] B15. culling-state filters work
+- [ ] B16. state counts are correct
+- [ ] B17. JSON list export works
+- [ ] B18. JSON list import works
+- [ ] B19. list-order round-trip is exact
+- [ ] B20. CSV export works
+- [ ] B21. TXT export works
+- [ ] B22. Clipboard export works
+
+Closeout:
+
+- [ ] B23. all new user-facing UI is Simplified Chinese
+- [ ] B24. source-media files remain unchanged
+
+After the walkthrough, record the date, EXE HEAD, and any deviation here.
+Until then, §18 counts as covered by automated UI tests only — not by a
+human EXE pass.
+
+---
+
+## C. Docs updated
 
 - `README.md` — culling workflow plus JSON/CSV/TXT/clipboard export.
 - `ARCHITECTURE.md` — portable list, match-then-persist import, CSV/TXT/
@@ -79,12 +139,15 @@ automated UI tests above, not by a human clicking the EXE.
   `Independent review is complete` stays unchecked: no independent human
   review has happened.
 
-## 5. Leftovers (handoff §9, not blockers)
+## D. Leftovers (handoff §9, not blockers)
 
-- No UI test forces the ambiguous-source remap dialog via Level 2 (relocation
-  fixtures can Level-3-match identical JPEGs and skip remaps). Left as is.
-- `if result.matched > 0 or result.list_id` in `_on_import_list` is always true
-  after a successful import. Left as is (refresh is harmless).
+Two §9 items were fixed after the 2D closeout and are no longer leftover:
+ambiguous-source remap dialog coverage
+(`test_import_ambiguous_source_opens_remap_dialog`) and the always-true
+import-refresh condition (now unconditional `self.refresh()`).
+
+Remaining, deliberately untouched:
+
 - `_match_item` `"missing"` / `"ambiguous"` magic strings and raw L3 SQL remain.
 - Empty-`source` + basename `relative_path` for media without an owning enabled
   folder remains.
