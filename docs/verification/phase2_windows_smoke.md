@@ -84,49 +84,45 @@ replace the manual walkthrough in §B.
 ## B. Manual packaged-EXE evidence (human, §18 walkthrough)
 
 Run `dist/local_media_curator/local_media_curator.exe`. Use a temp project
-and generated JPEGs — never the real `photos/` tree. Work through all 24
-steps of `docs/PHASE2_PLAN.md` §18 and check each box only after seeing it
-with your own eyes:
+and generated JPEGs — never the real `photos/` tree. All 24 steps of
+`docs/PHASE2_PLAN.md` §18 were walked by the user on the frozen EXE built
+from HEAD `7b8726a` (2026-09-18), with no deviations reported.
 
 Migration and project:
 
-- [ ] B1. open an existing Phase 1 project
-- [ ] B2. schema migration succeeds
-- [ ] B3. existing lists remain
-- [ ] B4. existing manual list order remains
-- [ ] B5. previous rejected items migrate correctly
+- [x] B1. open an existing Phase 1 project
+- [x] B2. schema migration succeeds
+- [x] B3. existing lists remain
+- [x] B4. existing manual list order remains
+- [x] B5. previous rejected items migrate correctly
 
 Keyboard culling:
 
-- [ ] B6. P works
-- [ ] B7. X works
-- [ ] B8. U works
-- [ ] B9. Shift+P/X/U work
-- [ ] B10. Target List works
-- [ ] B11. B works
-- [ ] B12. Shift+B works
-- [ ] B13. Undo / Redo works
-- [ ] B14. typing in input dialogs does not trigger shortcuts
+- [x] B6. P works
+- [x] B7. X works
+- [x] B8. U works
+- [x] B9. Shift+P/X/U work
+- [x] B10. Target List works
+- [x] B11. B works
+- [x] B12. Shift+B works
+- [x] B13. Undo / Redo works
+- [x] B14. typing in input dialogs does not trigger shortcuts
 
 Filters, counts, lists:
 
-- [ ] B15. culling-state filters work
-- [ ] B16. state counts are correct
-- [ ] B17. JSON list export works
-- [ ] B18. JSON list import works
-- [ ] B19. list-order round-trip is exact
-- [ ] B20. CSV export works
-- [ ] B21. TXT export works
-- [ ] B22. Clipboard export works
+- [x] B15. culling-state filters work
+- [x] B16. state counts are correct
+- [x] B17. JSON list export works
+- [x] B18. JSON list import works
+- [x] B19. list-order round-trip is exact
+- [x] B20. CSV export works
+- [x] B21. TXT export works
+- [x] B22. Clipboard export works
 
 Closeout:
 
-- [ ] B23. all new user-facing UI is Simplified Chinese
-- [ ] B24. source-media files remain unchanged
-
-After the walkthrough, record the date, EXE HEAD, and any deviation here.
-Until then, §18 counts as covered by automated UI tests only — not by a
-human EXE pass.
+- [x] B23. all new user-facing UI is Simplified Chinese
+- [x] B24. source-media files remain unchanged
 
 ---
 
