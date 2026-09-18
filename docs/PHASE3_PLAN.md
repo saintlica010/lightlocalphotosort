@@ -1200,49 +1200,69 @@ Phase 3 may merge only when all **repository-owned** requirements are satisfied.
 
 ## Quick List
 
-- [ ] Quick slots `1..9` are stable and persistent
-- [ ] Empty slot auto-creates `快捷名单 N`
-- [ ] Number shortcuts add idempotently
-- [ ] Multi-selection quick add works
-- [ ] `Shift+1..9` add-and-advance works
-- [ ] Rename preserves slot
-- [ ] Delete clears slot
-- [ ] Slot reassignment does not alter list membership
-- [ ] Text-entry focus prevents numeric shortcut misfires
-- [ ] Slot indicators are correct
-- [ ] Grid quick-membership indicators are correct
+- [x] Quick slots `1..9` are stable and persistent
+- [x] Empty slot auto-creates `快捷名单 N`
+- [x] Number shortcuts add idempotently
+- [x] Multi-selection quick add works
+- [x] `Shift+1..9` add-and-advance works
+- [x] Rename preserves slot
+- [x] Delete clears slot
+- [x] Slot reassignment does not alter list membership
+- [x] Text-entry focus prevents numeric shortcut misfires
+- [x] Slot indicators are correct
+- [x] Grid quick-membership indicators are correct
 
 ## Lightroom exporter
 
-- [ ] `.lrsmcol` format was implemented from verified references/examples
-- [ ] Export is deterministic
-- [ ] JPEG stem extraction is correct
-- [ ] Duplicate stems are handled safely
-- [ ] User is warned about cross-folder duplicate-stem ambiguity
-- [ ] No source media is modified
-- [ ] No XMP is written
-- [ ] No Lightroom catalog is modified
+- [x] `.lrsmcol` format was implemented from verified references/examples
+- [x] Export is deterministic
+- [x] JPEG stem extraction is correct
+- [x] Duplicate stems are handled safely
+- [x] User is warned about cross-folder duplicate-stem ambiguity
+- [x] No source media is modified
+- [x] No XMP is written
+- [x] No Lightroom catalog is modified
 - [ ] Packaged EXE can generate `.lrsmcol`
 
 ## UI
 
-- [ ] Design tokens are centralized
-- [ ] Modern UI migration is complete for agreed Phase 3 surfaces
-- [ ] Keyboard focus is clearly visible
-- [ ] Picked / Rejected / selected states remain clear
-- [ ] Simplified Chinese requirement is preserved
-- [ ] 1k / 10k GUI smoke has no meaningful structural regression
+- [x] Design tokens are centralized
+- [x] Modern UI migration is complete for agreed Phase 3 surfaces
+- [x] Keyboard focus is clearly visible
+- [x] Picked / Rejected / selected states remain clear
+- [x] Simplified Chinese requirement is preserved
+- [x] 1k / 10k GUI smoke has no meaningful structural regression
 
 ## Regression / safety
 
 - [ ] Full automated suite passes
 - [ ] Phase 1 regression requirements pass
 - [ ] Phase 2 regression requirements pass
-- [ ] Source-media immutability holds
-- [ ] Protected data is absent from Git
+- [x] Source-media immutability holds
+- [x] Protected data is absent from Git
 - [ ] Protected data is absent from packaged build
 - [ ] Windows packaged-EXE smoke passes
 - [ ] Independent review is complete
+
+
+### Closeout record (not a merge)
+
+Checked boxes above were verified on Linux, Python 3.13.5,
+`QT_QPA_PLATFORM=offscreen`, against `codex/phase3` at `af90cbf`:
+270 passed, 1 skipped (`PyInstaller` is not installed), 1 failed.
+The failure is `tests/test_project_service.py::test_windows_case_insensitive_overlap`,
+a pre-existing Windows case-fold check on a case-sensitive disk. It is not a
+Phase 3 regression.
+
+1k and 10k GUI smoke, quick-list tests, and `.lrsmcol` tests are inside that
+run. `git ls-files` shows nothing under `photos/`, `phototakeplan/`, or
+`lightphotosprt/`. Spec tests confirm `datas=[]` and that those trees are not
+named in `build/local_media_curator.spec`.
+
+Left open on purpose: packaged EXE generation and smoke, protected-data check
+of a built package, the full-suite checkbox (the Windows path test did not
+pass here), Phase 1/2 boxes (they include the Windows package), independent
+review, and Lightroom Classic import.
 
 ---
 

@@ -38,7 +38,7 @@ Three-panel shell:
 +----------------+--------------------------------+------------------+
 ```
 
-Implemented as a `QMainWindow` with a horizontal `QSplitter`. Library views are All, Unassigned, Picked, Undecided, and Rejected, plus named virtual lists. Live counters summarize the three culling states. The status tip shows `Library (sorted)` versus `List (manual order)`.
+Implemented as a `QMainWindow` with a horizontal `QSplitter`. Library views are All, Unassigned, Picked, Undecided, and Rejected, plus named virtual lists. Live counters summarize the three culling states. The status bar shows `媒体库（自动排序）`, `名单（手动排序）`, or `名单（已筛选，排序已禁用）`.
 
 ## Scanning
 
@@ -106,3 +106,19 @@ Phase 2 export means list/manifest export. Source photo bytes are never copied, 
 ## Packaging
 
 Windows one-folder PyInstaller build. Spec: `build/local_media_curator.spec`. Entry: `local_media_curator.__main__:main`. Output: `dist/local_media_curator/local_media_curator.exe`.
+
+## Quick lists
+
+Slots `1..9` are `project_settings` keys `quick_list_slot_1` … `quick_list_slot_9`. Values are list ids. Schema stays at version 2. `ListService` binds, unbinds, and auto-creates `快捷名单 N`. Membership is still `list_items`. The grid badge is a projection of that membership (`QuickSlotsRole`), not a second store. Number shortcuts live on the Edit menu and no-op while a text editor or editable combo has focus.
+
+## Lightroom smart collection
+
+`domain/lightroom_smart_collection.py` writes a Lua `.lrsmcol`. JPEG stems become `beginsWith` rules combined with `union`. Non-JPEG items are skipped. The menu label is experimental. `ExportService` writes only the chosen destination. It does not write XMP, `.lrcat`, or source media.
+
+## Theme
+
+`ui/theme.py` owns the tokens and the one stylesheet. `MainWindow` applies it. `ThumbnailDelegate` still paints the grid and reads the same tokens for card, selection, picked, rejected, focus, and slot badge. No third-party UI kit and no icon font.
+
+## Phase 3 closeout
+
+Automated verification on Linux (Python 3.13.5, offscreen Qt) at `af90cbf`: 270 passed, 1 skipped because PyInstaller is not installed, 1 failed. The failure is `test_windows_case_insensitive_overlap` on a case-sensitive filesystem. 1k and 10k GUI smoke ran in that suite. No Windows EXE was built here. `datas=[]` in the spec is covered by `tests/test_packaging.py`.

@@ -81,3 +81,7 @@ filter combos, grid view, preview, menus, status bar, and the dialogs we own
 OS chrome. The grid is still a `QListView` plus `ThumbnailDelegate`; card,
 selection, picked, and rejected colors come from the tokens. Spacing, filters,
 list membership, and export are unchanged.
+
+## Phase 3F closeout
+
+Checked merge-gate boxes in `docs/PHASE3_PLAN.md` are only items this Linux run actually passed. Not built: the Windows EXE, so packaged-smoke boxes stay open. Not claimed: Lightroom Classic import, or independent review. The full-suite box stays open because `test_windows_case_insensitive_overlap` still fails on a case-sensitive disk; that failure predates Phase 3.
