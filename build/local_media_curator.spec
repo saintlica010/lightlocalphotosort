@@ -7,6 +7,25 @@ from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_submodules
 
+
+def _filter_windows_root_icu(binaries):
+    """Drop only externally discovered ICU binaries at the bundle root."""
+    if sys.platform != "win32":
+        return binaries
+
+    filtered = []
+    for entry in binaries:
+        target = str(entry[0]).replace("\\", "/").lstrip("/")
+        name = target.casefold()
+        is_root_icu = "/" not in target and (
+            name == "icuuc.dll"
+            or (name.startswith("icudt") and name.endswith(".dll"))
+        )
+        if not is_root_icu:
+            filtered.append(entry)
+    return filtered
+
+
 spechome = Path(SPECPATH).resolve()
 root = spechome.parent
 src = root / "src"
@@ -27,6 +46,7 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+a.binaries = _filter_windows_root_icu(a.binaries)
 pyz = PYZ(a.pure)
 
 exe = EXE(
