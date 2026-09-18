@@ -975,6 +975,21 @@ class MainWindow(QMainWindow):
             "复制相对路径", ExportService.clipboard_relative_paths
         )
 
+    def _named_list_has_items(self, name: str) -> bool:
+        if self.list_service is None:
+            return False
+        row = next(
+            (
+                item
+                for item in self.list_service.all_lists()
+                if str(item["name"]) == name
+            ),
+            None,
+        )
+        if row is None:
+            return False
+        return self.list_service.count(int(row["id"])) > 0
+
     def _on_import_list(self) -> None:
         if self.project is None:
             return
@@ -984,6 +999,13 @@ class MainWindow(QMainWindow):
         service = ExportService(self.project)
         try:
             match = service.match_list(path)
+            if self._named_list_has_items(match.name):
+                if not ask_confirm(
+                    self,
+                    "导入名单",
+                    f"导入将替换名单「{match.name}」中的现有项目。继续？",
+                ):
+                    return
             remaps: dict[str, Path] = {}
             if match.missing or match.ambiguous:
                 for source in sorted(
@@ -995,11 +1017,12 @@ class MainWindow(QMainWindow):
                     chosen = choose_existing_directory(
                         self, f"为源 {source} 选择新根目录"
                     )
-                    if chosen is not None:
-                        remaps[source] = chosen
-                if not remaps:
-                    # Remap required but every dialog was cancelled — do not wipe.
-                    return
+                    if chosen is None:
+                        # Any remap dialog cancelled aborts the whole import:
+                        # a partial match must never wipe an existing list.
+                        self.statusBar().showMessage("已取消导入")
+                        return
+                    remaps[source] = chosen
             result = service.import_list(path, remaps=remaps or None)
         except ValueError as exc:
             show_warning(self, "无法导入", str(exc))

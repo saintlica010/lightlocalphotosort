@@ -178,6 +178,10 @@ def test_import_ui_cancel_remap_preserves_existing_list(
         lambda *args, **kwargs: dest,
     )
     monkeypatch.setattr(
+        "local_media_curator.ui.main_window.ask_confirm",
+        lambda *args, **kwargs: True,
+    )
+    monkeypatch.setattr(
         "local_media_curator.ui.main_window.choose_existing_directory",
         lambda *args, **kwargs: None,
     )
@@ -187,4 +191,183 @@ def test_import_ui_cancel_remap_preserves_existing_list(
     )
     window.import_list_action.trigger()
     assert ListService(project).ordered_media_ids(list_id) == original
+    assert window.statusBar().currentMessage() == "已取消导入"
+    project.close()
+
+
+def _same_name_manifest(tmp_path: Path, order: tuple[str, ...]) -> Path:
+    dest = tmp_path / "Website.llplist.json"
+    lines = [
+        "{",
+        '  "format": "light-local-photo-list",',
+        '  "version": 1,',
+        '  "list": {"name": "Website"},',
+        '  "items": [',
+    ]
+    entries = []
+    for position, name in enumerate(order):
+        entries.append(
+            "    {\n"
+            f'      "order": {position},\n'
+            '      "source": "camera-a",\n'
+            f'      "relative_path": "{name}",\n'
+            f'      "file_name": "{name}",\n'
+            '      "file_size": 12,\n'
+            '      "modified_at": "2026-01-01T00:00:00"\n'
+            "    }"
+        )
+    lines.append(",\n".join(entries))
+    lines.extend(["  ]", "}"])
+    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return dest
+
+
+def test_import_declined_replace_keeps_existing_list(
+    qtbot, tmp_path: Path, monkeypatch
+) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "camera-a"
+    _fill(source, ("A.jpg", "B.jpg"))
+    LibraryService(project).add_source_folder(source)
+    LibraryService(project).scan()
+    ids = {
+        str(row["file_name"]): int(row["id"])
+        for row in project.connection.execute("SELECT id, file_name FROM media")
+    }
+    lists = ListService(project)
+    list_id = lists.create("Website")
+    lists.add_items(list_id, [ids["B.jpg"], ids["A.jpg"]])
+    original = lists.ordered_media_ids(list_id)
+    dest = _same_name_manifest(tmp_path, ("A.jpg", "B.jpg"))
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    asked: list[tuple] = []
+    summaries: list[tuple] = []
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.choose_open_file",
+        lambda *args, **kwargs: dest,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.ask_confirm",
+        lambda parent, title, text: asked.append((title, text)) or False,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.show_import_summary",
+        lambda *args, **kwargs: summaries.append(args),
+    )
+    window.import_list_action.trigger()
+    assert len(asked) == 1
+    assert asked[0][0] == "导入名单"
+    assert "Website" in asked[0][1]
+    assert summaries == []
+    assert ListService(project).ordered_media_ids(list_id) == original
+    project.close()
+
+
+def test_import_confirmed_replace_persists_new_order(
+    qtbot, tmp_path: Path, monkeypatch
+) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "camera-a"
+    _fill(source, ("A.jpg", "B.jpg"))
+    LibraryService(project).add_source_folder(source)
+    LibraryService(project).scan()
+    ids = {
+        str(row["file_name"]): int(row["id"])
+        for row in project.connection.execute("SELECT id, file_name FROM media")
+    }
+    lists = ListService(project)
+    list_id = lists.create("Website")
+    lists.add_items(list_id, [ids["B.jpg"], ids["A.jpg"]])
+    dest = _same_name_manifest(tmp_path, ("A.jpg", "B.jpg"))
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    asked: list[tuple] = []
+    summaries: list[dict] = []
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.choose_open_file",
+        lambda *args, **kwargs: dest,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.ask_confirm",
+        lambda parent, title, text: asked.append((title, text)) or True,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.show_import_summary",
+        lambda *args, **kwargs: summaries.append(kwargs),
+    )
+    window.import_list_action.trigger()
+    assert len(asked) == 1
+    assert asked[0][0] == "导入名单"
+    assert ListService(project).ordered_media_ids(list_id) == [
+        ids["A.jpg"],
+        ids["B.jpg"],
+    ]
+    assert summaries == [{"matched": 2, "missing": 0, "ambiguous": 0}]
+    project.close()
+
+
+def test_import_partial_remap_cancel_aborts_without_persist(
+    qtbot, tmp_path: Path, monkeypatch
+) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "camera-a"
+    _fill(source, ("A.jpg", "B.jpg"))
+    LibraryService(project).add_source_folder(source)
+    LibraryService(project).scan()
+    before_lists = [
+        str(row["name"]) for row in ListService(project).all_lists()
+    ]
+    dest = tmp_path / "Relocated.llplist.json"
+    dest.write_text(
+        "{\n"
+        '  "format": "light-local-photo-list",\n'
+        '  "version": 1,\n'
+        '  "list": {"name": "Relocated"},\n'
+        '  "items": [{\n'
+        '    "order": 0,\n'
+        '    "source": "drive-a",\n'
+        '    "relative_path": "GONE-A.jpg",\n'
+        '    "file_name": "GONE-A.jpg",\n'
+        '    "file_size": 12,\n'
+        '    "modified_at": "2026-01-01T00:00:00"\n'
+        "  }, {\n"
+        '    "order": 1,\n'
+        '    "source": "drive-b",\n'
+        '    "relative_path": "GONE-B.jpg",\n'
+        '    "file_name": "GONE-B.jpg",\n'
+        '    "file_size": 12,\n'
+        '    "modified_at": "2026-01-01T00:00:00"\n'
+        "  }]\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    answers = iter([tmp_path / "remap-a", None])
+    summaries: list[tuple] = []
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.choose_open_file",
+        lambda *args, **kwargs: dest,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.choose_existing_directory",
+        lambda *args, **kwargs: next(answers),
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.show_import_summary",
+        lambda *args, **kwargs: summaries.append(args),
+    )
+    window.import_list_action.trigger()
+    assert [
+        str(row["name"]) for row in ListService(project).all_lists()
+    ] == before_lists
+    assert summaries == []
+    assert window.statusBar().currentMessage() == "已取消导入"
     project.close()
