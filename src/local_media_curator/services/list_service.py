@@ -146,6 +146,17 @@ class ListService:
         self._lists.add_items(list_id, media_ids, _now_iso())
         self._project.connection.commit()
 
+    def replace_items(self, list_id: int, media_ids: list[int]) -> None:
+        """Replace list membership with media_ids in order (sparse sort keys)."""
+        conn = self._project.connection
+        try:
+            conn.execute("DELETE FROM list_items WHERE list_id = ?", (list_id,))
+            self._lists.add_items(list_id, media_ids, _now_iso())
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
     def remove_items(self, list_id: int, media_ids: list[int]) -> None:
         self._lists.remove_items(list_id, media_ids)
         self._project.connection.commit()

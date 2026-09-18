@@ -1,13 +1,27 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from local_media_curator.db.repositories import MediaRepository, SourceFolderRepository
 from local_media_curator.domain.models import Project
 from local_media_curator.domain.paths import normalize_path
-from local_media_curator.domain.portable_list import PortableItem, PortableList, to_json
+from local_media_curator.domain.portable_list import (
+    PortableItem,
+    PortableList,
+    from_json,
+    to_json,
+)
 from local_media_curator.services.list_service import ListService
+
+
+@dataclass
+class ImportResult:
+    list_id: int
+    matched: int
+    missing: list[PortableItem]
+    ambiguous: list[PortableItem]
 
 
 def source_labels(folder_paths: list[str]) -> dict[str, str]:
@@ -104,3 +118,77 @@ class ExportService:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(to_json(document), encoding="utf-8")
         return document
+
+    def import_list(
+        self, path: Path, remaps: dict[str, Path] | None = None
+    ) -> ImportResult:
+        document = from_json(Path(path).read_text(encoding="utf-8"))
+        remaps = remaps or {}
+
+        folder_paths = [str(row["path"]) for row in self._sources.list_enabled()]
+        labels = source_labels(folder_paths)
+        label_to_folder = {label: folder for folder, label in labels.items()}
+
+        matched_ids: list[int] = []
+        missing: list[PortableItem] = []
+        ambiguous: list[PortableItem] = []
+
+        for item in sorted(document.items, key=lambda entry: entry.order):
+            media_id = self._match_item(item, label_to_folder, remaps)
+            if isinstance(media_id, int):
+                matched_ids.append(media_id)
+            elif media_id == "ambiguous":
+                ambiguous.append(item)
+            else:
+                missing.append(item)
+
+        list_id = self._lists.create(document.name)
+        self._lists.replace_items(list_id, matched_ids)
+        return ImportResult(
+            list_id=list_id,
+            matched=len(matched_ids),
+            missing=missing,
+            ambiguous=ambiguous,
+        )
+
+    def _match_item(
+        self,
+        item: PortableItem,
+        label_to_folder: dict[str, str],
+        remaps: dict[str, Path],
+    ) -> int | str:
+        # Level 1: current project source whose label equals item.source.
+        folder = label_to_folder.get(item.source)
+        if folder is not None:
+            candidate = self._media.get_by_normalized_path(
+                normalize_path(Path(folder) / Path(item.relative_path))
+            )
+            if candidate is not None:
+                return int(candidate["id"])
+
+        # Level 2: user-provided remapped root for this source label.
+        remap_root = remaps.get(item.source)
+        if remap_root is not None:
+            candidate = self._media.get_by_normalized_path(
+                normalize_path(Path(remap_root) / Path(item.relative_path))
+            )
+            if candidate is not None:
+                return int(candidate["id"])
+
+        # Level 3: filename + size + mtime fingerprint. None fields → missing.
+        if item.file_size is None or item.modified_at is None:
+            return "missing"
+        rows = list(
+            self._project.connection.execute(
+                """
+                SELECT id FROM media
+                WHERE file_name = ? AND file_size = ? AND modified_at = ?
+                """,
+                (item.file_name, item.file_size, item.modified_at),
+            )
+        )
+        if len(rows) == 1:
+            return int(rows[0][0])
+        if len(rows) >= 2:
+            return "ambiguous"
+        return "missing"
