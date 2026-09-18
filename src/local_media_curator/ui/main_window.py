@@ -23,6 +23,7 @@ from local_media_curator.domain.models import Media, Project
 from local_media_curator.media.scan_worker import ScanWorker
 from local_media_curator.media.thumbnail_pool import ThumbnailPool
 from local_media_curator.media.thumbnail_service import ThumbnailService
+from local_media_curator.services.export_service import ExportService
 from local_media_curator.services.library_service import LibraryService
 from local_media_curator.services.list_service import ListService
 from local_media_curator.services.project_service import create_project, open_project
@@ -32,8 +33,13 @@ from local_media_curator.ui.dialogs import (
     ask_confirm,
     choose_existing_directory,
     choose_list_name,
+    choose_open_file,
+    choose_save_file,
+    show_import_summary,
     show_warning,
 )
+
+_PORTABLE_LIST_FILTER = "可移植名单 (*.llplist.json)"
 from local_media_curator.ui.library_panel import LibraryPanel
 from local_media_curator.ui.media_grid import MediaGrid
 from local_media_curator.ui.media_model import MediaListModel
@@ -74,9 +80,10 @@ class MainWindow(QMainWindow):
 
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.library_panel = LibraryPanel()
+        self.list_panel = self.library_panel.list_panel
         self.media_grid = MediaGrid()
         self.preview_panel = PreviewPanel()
-        self.target_list_label = self.library_panel.list_panel.target_label
+        self.target_list_label = self.list_panel.target_label
         splitter.addWidget(self.library_panel)
         splitter.addWidget(self.media_grid)
         splitter.addWidget(self.preview_panel)
@@ -563,6 +570,10 @@ class MainWindow(QMainWindow):
         self.scan_action.triggered.connect(self._on_scan)
         self.open_original_action = QAction("打开原文件", self)
         self.open_original_action.triggered.connect(self._on_open_original)
+        self.export_list_action = QAction("导出名单...", self)
+        self.export_list_action.triggered.connect(self._on_export_list)
+        self.import_list_action = QAction("导入名单...", self)
+        self.import_list_action.triggered.connect(self._on_import_list)
         file_menu.addAction(new_project)
         file_menu.addAction(open_project_action)
         file_menu.addSeparator()
@@ -570,6 +581,9 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.remove_source_action)
         file_menu.addAction(self.scan_action)
         file_menu.addAction(self.open_original_action)
+        file_menu.addSeparator()
+        file_menu.addAction(self.export_list_action)
+        file_menu.addAction(self.import_list_action)
 
         undo = QAction("撤销", self)
         undo.setShortcut(QKeySequence.StandardKey.Undo)
@@ -707,6 +721,8 @@ class MainWindow(QMainWindow):
         self.add_source_action.setEnabled(enabled)
         self.remove_source_action.setEnabled(enabled)
         self.scan_action.setEnabled(enabled)
+        self.export_list_action.setEnabled(enabled)
+        self.import_list_action.setEnabled(enabled)
         for action in (
             getattr(self, "pick_action", None),
             getattr(self, "culling_reject_action", None),
@@ -807,6 +823,84 @@ class MainWindow(QMainWindow):
 
     def _on_open_original(self) -> None:
         self.preview_panel.open_original()
+
+    def _on_export_list(self) -> None:
+        if self.project is None or self.list_service is None:
+            return
+        list_id = self.list_panel.selected_list_id()
+        list_name: str | None = None
+        if list_id is not None:
+            list_name = next(
+                (
+                    str(row["name"])
+                    for row in self.list_service.all_lists()
+                    if int(row["id"]) == list_id
+                ),
+                None,
+            )
+        if list_id is None or list_name is None:
+            rows = self.list_service.all_lists()
+            if not rows:
+                show_warning(self, "无法导出", "没有可导出的名单。")
+                return
+            chosen = choose_list_name(
+                self, [str(row["name"]) for row in rows], title="导出名单"
+            )
+            if not chosen:
+                return
+            match = next(
+                (row for row in rows if str(row["name"]) == chosen), None
+            )
+            if match is None:
+                return
+            list_id = int(match["id"])
+            list_name = str(match["name"])
+        destination = choose_save_file(
+            self,
+            "导出名单",
+            _PORTABLE_LIST_FILTER,
+            default_name=f"{list_name}.llplist.json",
+        )
+        if destination is None:
+            return
+        try:
+            ExportService(self.project).export_list(list_id, destination)
+        except ValueError as exc:
+            show_warning(self, "无法导出", str(exc))
+
+    def _on_import_list(self) -> None:
+        if self.project is None:
+            return
+        path = choose_open_file(self, "导入名单", _PORTABLE_LIST_FILTER)
+        if path is None:
+            return
+        try:
+            result = ExportService(self.project).import_list(path)
+            if result.missing:
+                remaps: dict[str, Path] = {}
+                for source in sorted(
+                    {item.source for item in result.missing}
+                ):
+                    chosen = choose_existing_directory(
+                        self, f"为源 {source} 选择新根目录"
+                    )
+                    if chosen is not None:
+                        remaps[source] = chosen
+                if remaps:
+                    result = ExportService(self.project).import_list(
+                        path, remaps=remaps
+                    )
+        except ValueError as exc:
+            show_warning(self, "无法导入", str(exc))
+            return
+        show_import_summary(
+            self,
+            matched=result.matched,
+            missing=len(result.missing),
+            ambiguous=len(result.ambiguous),
+        )
+        if result.matched > 0 or result.list_id:
+            self.refresh()
 
     def _on_undo(self) -> None:
         if self.undo_stack is None:

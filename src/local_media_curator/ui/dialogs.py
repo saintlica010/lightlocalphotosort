@@ -86,6 +86,44 @@ def choose_existing_directory(parent: QWidget | None, title: str) -> Path | None
     return Path(chosen)
 
 
+def choose_save_file(
+    parent: QWidget | None,
+    title: str,
+    named_filter: str,
+    default_name: str = "",
+) -> Path | None:
+    chosen, _selected = QFileDialog.getSaveFileName(
+        parent, title, default_name, named_filter
+    )
+    if not chosen:
+        return None
+    return Path(chosen)
+
+
+def choose_open_file(
+    parent: QWidget | None, title: str, named_filter: str
+) -> Path | None:
+    chosen, _selected = QFileDialog.getOpenFileName(
+        parent, title, "", named_filter
+    )
+    if not chosen:
+        return None
+    return Path(chosen)
+
+
+def show_import_summary(
+    parent: QWidget | None, matched: int, missing: int, ambiguous: int
+) -> None:
+    """Show import match counts with Chinese OK. See show_warning."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Information)
+    box.setWindowTitle("导入名单")
+    box.setText(f"已匹配：{matched}\n缺失：{missing}\n歧义：{ambiguous}")
+    box.setStandardButtons(QMessageBox.StandardButton.Ok)
+    box.button(QMessageBox.StandardButton.Ok).setText("确定")
+    box.exec()
+
+
 def choose_list_name(
     parent: QWidget | None,
     names: list[str],
