@@ -66,7 +66,7 @@ def test_set_project_scan_populates_grid(qtbot, tmp_path: Path) -> None:
     project.close()
 
 
-def test_reject_via_stack_hides_from_default_list_media(qtbot, tmp_path: Path) -> None:
+def test_reject_via_stack_stays_visible_in_all_view(qtbot, tmp_path: Path) -> None:
     window, project, _source = _open_scanned_window(qtbot, tmp_path)
     media_id = int(window.media_grid.model.row_at(0)["id"])
     window.undo_stack.reject([media_id])
@@ -79,8 +79,9 @@ def test_reject_via_stack_hides_from_default_list_media(qtbot, tmp_path: Path) -
         )
         for i in range(window.media_grid.model.rowCount())
     ]
-    assert media_id not in remaining
-    assert window.media_grid.model.rowCount() == 1
+    assert media_id in remaining
+    assert window.media_grid.model.rowCount() == 2
+    assert window.media_grid.model.row_at(0)["culling_state"] == "rejected"
     project.close()
 
 
@@ -116,8 +117,10 @@ def test_library_views_switch_grid(qtbot, tmp_path: Path) -> None:
     window.refresh()
 
     window.show_library_view("all")
-    assert window.media_grid.model.rowCount() == 1
-    assert window.media_grid.model.row_at(0)["file_name"] == "A.jpg"
+    assert window.media_grid.model.rowCount() == 2
+    assert {
+        window.media_grid.model.row_at(i)["file_name"] for i in range(2)
+    } == {"A.jpg", "B.jpg"}
 
     window.show_library_view("unassigned")
     assert window.media_grid.model.rowCount() == 0
@@ -143,11 +146,13 @@ def test_delete_rejects_selection_via_undo_stack(qtbot, tmp_path: Path) -> None:
     )
     reject.trigger()
     assert window.library_service.list_media(include_rejected=False) == []
-    assert window.media_grid.model.rowCount() == 0
+    assert window.media_grid.model.rowCount() == 1
+    assert window.media_grid.model.row_at(0)["culling_state"] == "rejected"
     window.undo_stack.undo()
     window.refresh()
     assert [item.file_name for item in window.library_service.list_media()] == ["A.jpg"]
     assert window.media_grid.model.rowCount() == 1
+    assert window.media_grid.model.row_at(0)["culling_state"] == "undecided"
     project.close()
 
 
@@ -188,6 +193,13 @@ def test_reject_clears_preview_when_grid_empty(qtbot, tmp_path: Path) -> None:
     assert window.preview_panel.file_name_label.text() == "A.jpg"
 
     window.reject_selection()
+    assert window.media_grid.model.rowCount() == 1
+    assert window.preview_panel.file_name_label.text() == "A.jpg"
+
+    window.show_library_view("rejected")
+    assert window.media_grid.model.rowCount() == 1
+    window.media_grid.view.setCurrentIndex(window.media_grid.model.index(0))
+    window.restore_selection()
 
     assert window.media_grid.model.rowCount() == 0
     assert window.preview_panel.file_name_label.text() == ""

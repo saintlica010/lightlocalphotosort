@@ -1310,8 +1310,10 @@ class MainWindow(QMainWindow):
                 source_folder=source_folder,
                 missing=missing,
             )
+        # The All view contains every culling state:
+        # all = picked + undecided + rejected.
         return self.library_service.list_media(
-            include_rejected=False,
+            include_rejected=True,
             sort_by=self._sort_by,
             media_type=media_type,
             extension=extension,

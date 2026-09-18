@@ -47,6 +47,25 @@ def test_culling_state_filters_and_counts(tmp_path: Path) -> None:
     project.close()
 
 
+def test_all_view_contains_all_culling_states(qtbot, tmp_path: Path) -> None:
+    project, library, ids = _setup(tmp_path)
+    service = RejectionService(project)
+    service.set_state([ids["A.jpg"]], "picked")
+    service.set_state([ids["B.jpg"]], "rejected")
+    assert sorted(
+        item.file_name for item in library.list_media(include_rejected=True)
+    ) == ["A.jpg", "B.jpg", "C.jpg"]
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    window.show_library_view("all")
+    assert window.media_grid.model.rowCount() == 3
+    assert sorted(
+        window.media_grid.model.row_at(i)["file_name"] for i in range(3)
+    ) == ["A.jpg", "B.jpg", "C.jpg"]
+    project.close()
+
+
 def test_bulk_culling_is_one_undo_unit_and_restores_mixed_states(tmp_path: Path) -> None:
     project, _library, ids = _setup(tmp_path)
     stack = CurationUndoStack(project)

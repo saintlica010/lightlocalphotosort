@@ -37,9 +37,16 @@ def test_undo_reject_restores_selection_and_preview(qtbot, tmp_path: Path) -> No
     media_id = int(window.media_grid.model.data(target, MediaListModel.IdRole))
     file_name = window.media_grid.model.row_at(1)["file_name"]
     window.reject_selection()
-    qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 1, timeout=8000)
+    qtbot.waitUntil(
+        lambda: window.media_grid.model.row_at(1)["culling_state"] == "rejected",
+        timeout=8000,
+    )
+    assert window.media_grid.model.rowCount() == 2
     window._on_undo()
-    qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 2, timeout=8000)
+    qtbot.waitUntil(
+        lambda: window.media_grid.model.row_at(1)["culling_state"] == "undecided",
+        timeout=8000,
+    )
     current = window.media_grid.view.currentIndex()
     assert current.isValid()
     assert int(window.media_grid.model.data(current, MediaListModel.IdRole)) == media_id

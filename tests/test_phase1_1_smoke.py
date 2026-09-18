@@ -51,7 +51,11 @@ def test_phase1_1_end_to_end_smoke(qtbot, tmp_path: Path) -> None:
     window.show_library_view("all")
     window.media_grid.view.setCurrentIndex(window.media_grid.model.index(0))
     window.reject_selection()
-    qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 1, timeout=8000)
+    qtbot.waitUntil(
+        lambda: window.media_grid.model.row_at(0)["culling_state"] == "rejected",
+        timeout=8000,
+    )
+    assert window.media_grid.model.rowCount() == 2
     window.show_library_view("rejected")
     qtbot.waitUntil(lambda: window.media_grid.model.rowCount() == 1, timeout=8000)
     window.restore_selection()
