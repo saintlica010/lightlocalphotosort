@@ -51,3 +51,17 @@ Schema version stays 2; no new table. Membership remains ordinary
 `list_items`. A list occupies at most one slot. Deleting a bound list clears
 that slot in the same transaction as the list delete. Rename does not touch
 the setting.
+
+## Lightroom smart collection export
+
+Phase 3C writes `.lrsmcol` as the Lua table Lightroom Classic uses for
+Smart Collection settings. The shape follows published files: `type =
+"LibrarySmartCollection"`, `criteria = "filename"`, `value2 = ""`, `version = 0`
+(gist.github.com/dergachev/6541450). Rules use `operation = "beginsWith"` and
+`combine = "union"`, matching a published catalog-to-smart-collection query
+(worldofthev1.blogspot.com, 2017). Each JPEG stem becomes `beginsWith "<stem>."`
+so the rule can hit the matching RAW without a hard-coded camera extension.
+`operation = "any"` in the gist matches a full filename including extension, so
+it is not used for the JPEG-to-RAW handoff. The feature stays labeled
+experimental until a real Lightroom import is confirmed. The exporter never
+writes `.lrcat`, XMP, or source media.

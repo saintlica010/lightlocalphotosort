@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from local_media_curator.db.repositories import MediaRepository, SourceFolderRepository
+from local_media_curator.domain.lightroom_smart_collection import (
+    render_lrsmcol,
+    unique_jpeg_stems,
+)
 from local_media_curator.domain.models import Project
 from local_media_curator.domain.paths import normalize_path
 from local_media_curator.domain.portable_list import (
@@ -113,6 +117,28 @@ class ExportService:
         with destination.open("w", encoding="utf-8", newline="") as handle:
             for item in document.items:
                 handle.write(f"{item.file_name}\n")
+        return destination
+
+    def export_lightroom_smart_collection(self, list_id: int, destination: Path) -> Path:
+        """Write a Lightroom Classic .lrsmcol for JPEG stems in this list.
+
+        Does not touch source media, XMP, or .lrcat. Destination is the only write.
+        """
+        rows = self._ordered_rows(list_id)
+        match = next(
+            (row for row in self._lists.all_lists() if int(row["id"]) == list_id),
+            None,
+        )
+        if match is None:
+            raise ValueError("名单不存在。")
+        stems = unique_jpeg_stems([str(row["file_name"]) for row in rows])
+        destination = Path(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            render_lrsmcol(str(match["name"]), stems),
+            encoding="utf-8",
+            newline="\n",
+        )
         return destination
 
     def clipboard_file_names(self, list_id: int) -> str:

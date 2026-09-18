@@ -26,6 +26,7 @@ class ListPanel(QWidget):
     set_target_requested = Signal(int)
     bind_slot_requested = Signal(int, int)
     unbind_slot_requested = Signal(int)
+    lightroom_export_requested = Signal(int)
     NameRole = Qt.ItemDataRole.UserRole + 1
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -143,6 +144,11 @@ class ListPanel(QWidget):
             lambda _checked=False, list_id=list_id: self.unbind_slot_requested.emit(list_id)
         )
         menu.addAction(clear)
+        export = QAction("导出 Lightroom 智能收藏夹（实验性）...", menu)
+        export.triggered.connect(
+            lambda _checked=False, list_id=list_id: self.lightroom_export_requested.emit(list_id)
+        )
+        menu.addAction(export)
         return menu
 
     def _show_context_menu(self, pos) -> None:

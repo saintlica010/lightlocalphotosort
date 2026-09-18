@@ -19,6 +19,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from local_media_curator.domain.lightroom_smart_collection import (
+    DUPLICATE_STEM_WARNING,
+)
 from local_media_curator.domain.models import Media, Project
 from local_media_curator.media.scan_worker import ScanWorker
 from local_media_curator.media.thumbnail_pool import ThumbnailPool
@@ -42,6 +45,7 @@ from local_media_curator.ui.dialogs import (
 _PORTABLE_LIST_FILTER = "可移植名单 (*.llplist.json)"
 _CSV_FILTER = "CSV (*.csv)"
 _TXT_FILTER = "文本文件 (*.txt)"
+_LRSMCOL_FILTER = "Lightroom 智能收藏夹 (*.lrsmcol)"
 from local_media_curator.ui.library_panel import LibraryPanel
 from local_media_curator.ui.media_grid import MediaGrid
 from local_media_curator.ui.media_model import MediaListModel
@@ -86,6 +90,7 @@ class MainWindow(QMainWindow):
         self.confirm_quick_rebind = None
         self.list_panel.bind_slot_requested.connect(self._on_bind_quick_slot)
         self.list_panel.unbind_slot_requested.connect(self._on_clear_quick_slot)
+        self.list_panel.lightroom_export_requested.connect(self._on_export_lightroom)
         self.media_grid = MediaGrid()
         self.preview_panel = PreviewPanel()
         self.target_list_label = self.list_panel.target_label
@@ -650,6 +655,12 @@ class MainWindow(QMainWindow):
         self.export_csv_action.triggered.connect(self._on_export_csv)
         self.export_txt_action = QAction("导出 TXT...", self)
         self.export_txt_action.triggered.connect(self._on_export_txt)
+        self.export_lightroom_action = QAction(
+            "导出 Lightroom 智能收藏夹（实验性）...", self
+        )
+        self.export_lightroom_action.triggered.connect(
+            lambda _checked=False: self._on_export_lightroom()
+        )
         self.copy_file_names_action = QAction("复制文件名", self)
         self.copy_file_names_action.triggered.connect(self._on_copy_file_names)
         self.copy_absolute_paths_action = QAction("复制绝对路径", self)
@@ -672,6 +683,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.import_list_action)
         file_menu.addAction(self.export_csv_action)
         file_menu.addAction(self.export_txt_action)
+        file_menu.addAction(self.export_lightroom_action)
         file_menu.addSeparator()
         file_menu.addAction(self.copy_file_names_action)
         file_menu.addAction(self.copy_absolute_paths_action)
@@ -838,6 +850,7 @@ class MainWindow(QMainWindow):
         self.import_list_action.setEnabled(enabled)
         self.export_csv_action.setEnabled(enabled)
         self.export_txt_action.setEnabled(enabled)
+        self.export_lightroom_action.setEnabled(enabled)
         self.copy_file_names_action.setEnabled(enabled)
         self.copy_absolute_paths_action.setEnabled(enabled)
         self.copy_relative_paths_action.setEnabled(enabled)
@@ -998,6 +1011,44 @@ class MainWindow(QMainWindow):
             return
         try:
             ExportService(self.project).export_list(list_id, destination)
+        except ValueError as exc:
+            show_warning(self, "无法导出", str(exc))
+
+    def _on_export_lightroom(self, list_id: int | None = None) -> None:
+        if self.project is None or self.list_service is None:
+            return
+        if list_id is None:
+            resolved = self._resolve_export_list("导出 Lightroom 智能收藏夹（实验性）")
+            if resolved is None:
+                return
+            list_id, list_name = resolved
+        else:
+            match = next(
+                (
+                    row
+                    for row in self.list_service.all_lists()
+                    if int(row["id"]) == int(list_id)
+                ),
+                None,
+            )
+            if match is None:
+                show_warning(self, "无法导出", "名单不存在。")
+                return
+            list_name = str(match["name"])
+            list_id = int(list_id)
+        show_warning(self, "Lightroom 智能收藏夹导出（实验性）", DUPLICATE_STEM_WARNING)
+        destination = choose_save_file(
+            self,
+            "导出 Lightroom 智能收藏夹（实验性）",
+            _LRSMCOL_FILTER,
+            default_name=f"{list_name}.lrsmcol",
+        )
+        if destination is None:
+            return
+        try:
+            ExportService(self.project).export_lightroom_smart_collection(
+                list_id, destination
+            )
         except ValueError as exc:
             show_warning(self, "无法导出", str(exc))
 
