@@ -14,6 +14,11 @@ from local_media_curator.domain.ordering import (
 __all__ = ["SORT_KEY_GAP", "ListService"]
 
 
+
+def _quick_slot_key(slot: int) -> str:
+    return f"quick_list_slot_{slot}"
+
+
 def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
@@ -100,6 +105,57 @@ class ListService:
         self._settings.delete("target_list_id")
         self._project.connection.commit()
 
+    def quick_slot_list_id(self, slot: int) -> int | None:
+        self._require_quick_slot(slot)
+        value = self._settings.get(_quick_slot_key(slot))
+        if value is None:
+            return None
+        try:
+            list_id = int(value)
+        except ValueError:
+            self.unbind_quick_slot(slot)
+            return None
+        if not any(int(row["id"]) == list_id for row in self._lists.list_all()):
+            self.unbind_quick_slot(slot)
+            return None
+        return list_id
+
+    def bind_quick_slot(self, slot: int, list_id: int) -> None:
+        self._require_quick_slot(slot)
+        if not any(int(row["id"]) == list_id for row in self._lists.list_all()):
+            raise ValueError("名单不存在。")
+        for other in range(1, 10):
+            if other == slot:
+                continue
+            if self._settings.get(_quick_slot_key(other)) == str(list_id):
+                self._settings.delete(_quick_slot_key(other))
+        self._settings.set(_quick_slot_key(slot), str(list_id))
+        self._project.connection.commit()
+
+    def unbind_quick_slot(self, slot: int) -> None:
+        self._require_quick_slot(slot)
+        self._settings.delete(_quick_slot_key(slot))
+        self._project.connection.commit()
+
+    def ensure_quick_slot(self, slot: int) -> int:
+        existing = self.quick_slot_list_id(slot)
+        if existing is not None:
+            return existing
+        list_id = self.create(f"快捷名单 {slot}")
+        self.bind_quick_slot(slot, list_id)
+        return list_id
+
+    def _require_quick_slot(self, slot: int) -> None:
+        if slot < 1 or slot > 9:
+            raise ValueError("快捷名单槽位必须是 1 到 9。")
+
+    def _clear_quick_slots_for(self, list_id: int) -> None:
+        needle = str(list_id)
+        for slot in range(1, 10):
+            if self._settings.get(_quick_slot_key(slot)) == needle:
+                self._settings.delete(_quick_slot_key(slot))
+
+
     def all_lists(self) -> list[dict[str, object]]:
         return [
             {
@@ -139,6 +195,7 @@ class ListService:
             raise
 
     def delete(self, list_id: int) -> None:
+        self._clear_quick_slots_for(list_id)
         self._lists.delete(list_id)
         self._project.connection.commit()
 

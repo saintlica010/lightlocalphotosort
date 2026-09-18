@@ -283,6 +283,17 @@ class MainWindow(QMainWindow):
     def add_selection_to_list(self, list_id: int) -> None:
         self.add_items_to_list(list_id, self.media_grid.selected_ids())
 
+    def add_selection_to_quick_slot(self, slot: int) -> None:
+        if not self._curation_shortcut_allowed():
+            return
+        if self.list_service is None or self.undo_stack is None:
+            return
+        media_ids = self.media_grid.selected_ids()
+        if not media_ids:
+            return
+        list_id = self.list_service.ensure_quick_slot(slot)
+        self.add_items_to_list(list_id, media_ids)
+
     def move_selection(self, delta: int) -> None:
         if (
             self.undo_stack is None
@@ -739,6 +750,17 @@ class MainWindow(QMainWindow):
             edit_menu.addAction(action)
             self.media_grid.view.addAction(action)
 
+        # 3A binds number keys to persistent slots, not the menu or badges.
+        self.quick_slot_actions = []
+        for slot in range(1, 10):
+            action = QAction(f"添加到快捷名单 {slot}", self)
+            action.setShortcut(QKeySequence(str(slot)))
+            action.triggered.connect(
+                lambda _checked=False, slot=slot: self.add_selection_to_quick_slot(slot)
+            )
+            self.addAction(action)
+            self.quick_slot_actions.append(action)
+
     def _set_project_actions_enabled(self, enabled: bool) -> None:
         self.add_source_action.setEnabled(enabled)
         self.remove_source_action.setEnabled(enabled)
@@ -763,6 +785,8 @@ class MainWindow(QMainWindow):
         ):
             if action is not None:
                 action.setEnabled(enabled)
+        for action in getattr(self, "quick_slot_actions", ()):
+            action.setEnabled(enabled)
 
     def _set_reorder_actions_enabled(self, enabled: bool) -> None:
         self.move_up_action.setEnabled(enabled)

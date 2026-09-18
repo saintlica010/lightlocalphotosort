@@ -42,3 +42,12 @@ first row after the last selected row. At the end of a view it preserves a
 still-visible selection or leaves selection empty when the action removed the
 last item. Single-letter actions are ignored while a text-editing widget has
 focus.
+
+## Quick List slots
+
+Phase 3A stores slots `1..9` in the existing `project_settings` table as
+`quick_list_slot_1` … `quick_list_slot_9`. Values are `list_id` strings.
+Schema version stays 2; no new table. Membership remains ordinary
+`list_items`. A list occupies at most one slot. Deleting a bound list clears
+that slot in the same transaction as the list delete. Rename does not touch
+the setting.
