@@ -74,7 +74,9 @@ class PreviewPanel(QWidget):
         self._current_path: Path | None = None
         self.loader = PreviewLoader(self)
         self.loader.loaded.connect(self._on_preview_loaded)
+        self.setObjectName("previewPanel")
         self.image_view = ImageView(self)
+        self.image_view.setObjectName("previewImage")
         self.file_name_label = QLabel()
         self.path_label = QLabel()
         self.dimensions_label = QLabel()
@@ -130,6 +132,9 @@ class PreviewPanel(QWidget):
         self.modified_at_label.setText(str(media.get("modified_at") or ""))
         self.lists_label.setText(_format_lists(lists))
         self.culling_state_label.setText(state_label)
+        self.culling_state_label.setObjectName(
+            {"picked": "previewPicked", "rejected": "previewRejected"}.get(state, "")
+        )
         self._load_preview(path_value)
 
     def open_original(self) -> None:
@@ -148,6 +153,7 @@ class PreviewPanel(QWidget):
         self.modified_at_label.clear()
         self.lists_label.clear()
         self.culling_state_label.clear()
+        self.culling_state_label.setObjectName("")
         self.image_view.set_image(None)
 
     def _load_preview(self, path_value: object) -> None:

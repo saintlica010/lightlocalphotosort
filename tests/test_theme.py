@@ -62,7 +62,7 @@ def test_stylesheet_is_token_driven_and_has_no_animation() -> None:
 def test_prototype_uses_tokens_without_touching_main_window(qtbot) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
-    assert window.styleSheet() == ""
+    assert window.styleSheet() == stylesheet()
     assert window.theme_prototype_action.text() == "设计样板..."
     prototype = ThemePrototype()
     qtbot.addWidget(prototype)

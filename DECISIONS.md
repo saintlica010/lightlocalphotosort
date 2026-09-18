@@ -72,3 +72,12 @@ Visual tokens live in one module, `ui/theme.py`. The QSS is generated from
 those tokens. No third-party UI toolkit and no icon font: markers stay the
 existing text glyphs. The prototype is a preview only. Filtering, lists, export,
 and the grid delegate are unchanged until Phase 3E migrates the real surfaces.
+
+## Phase 3E theme migration
+
+The running window uses `stylesheet()` from `ui/theme.py`. Sidebar, named lists,
+filter combos, grid view, preview, menus, status bar, and the dialogs we own
+(`QMessageBox`, `QInputDialog`) read those tokens. Native file dialogs stay
+OS chrome. The grid is still a `QListView` plus `ThumbnailDelegate`; card,
+selection, picked, and rejected colors come from the tokens. Spacing, filters,
+list membership, and export are unchanged.

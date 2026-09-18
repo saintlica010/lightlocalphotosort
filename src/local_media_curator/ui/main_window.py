@@ -50,6 +50,7 @@ from local_media_curator.ui.library_panel import LibraryPanel
 from local_media_curator.ui.media_grid import MediaGrid
 from local_media_curator.ui.media_model import MediaListModel
 from local_media_curator.ui.preview_panel import PreviewPanel
+from local_media_curator.ui.theme import stylesheet
 from local_media_curator.ui.theme_prototype import open_theme_prototype
 
 _LIBRARY_VIEW_ROWS = {
@@ -99,6 +100,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.media_grid)
         splitter.addWidget(self.preview_panel)
         self.setCentralWidget(splitter)
+        self.setStyleSheet(stylesheet())
 
         self._install_menus()
         self.media_grid.view.selectionModel().currentChanged.connect(

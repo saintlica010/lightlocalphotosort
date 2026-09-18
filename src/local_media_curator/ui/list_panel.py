@@ -32,6 +32,7 @@ class ListPanel(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.lists_widget = QListWidget(self)
+        self.lists_widget.setObjectName("namedLists")
         self.new_button = QPushButton("新建")
         self.rename_button = QPushButton("重命名")
         self.delete_button = QPushButton("删除")

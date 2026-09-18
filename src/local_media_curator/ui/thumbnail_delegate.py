@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QRect, QSize, Qt
-from PySide6.QtGui import QColor, QPainter, QPixmap
+from PySide6.QtGui import QColor, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 from local_media_curator.ui.media_model import MediaListModel
+from local_media_curator.ui.theme import TOKENS
 from local_media_curator.ui.pixmap_cache import BoundedPixmapCache
 
 THUMB_SIZE = 160
@@ -46,6 +47,31 @@ def quick_slot_badge(value: object) -> str | None:
     return " ".join(str(number) for number in sorted(numbers))
 
 
+
+def card_color(selected: bool) -> QColor:
+    return QColor(TOKENS.selection if selected else TOKENS.surface_3)
+
+
+def placeholder_color() -> QColor:
+    return QColor(TOKENS.border)
+
+
+def marker_color(state: object) -> QColor | None:
+    if state == "picked":
+        return QColor(TOKENS.picked)
+    if state == "rejected":
+        return QColor(TOKENS.rejected)
+    return None
+
+
+def slot_badge_color() -> QColor:
+    return QColor(TOKENS.accent)
+
+
+def filename_color() -> QColor:
+    return QColor(TOKENS.text)
+
+
 class ThumbnailDelegate(QStyledItemDelegate):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -54,7 +80,7 @@ class ThumbnailDelegate(QStyledItemDelegate):
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
         painter.save()
         selected = bool(option.state & QStyle.StateFlag.State_Selected)
-        painter.fillRect(option.rect, option.palette.highlight() if selected else QColor("#2b2b2b"))
+        painter.fillRect(option.rect, card_color(selected))
 
         thumb_rect = QRect(
             option.rect.left() + 8,
@@ -64,7 +90,7 @@ class ThumbnailDelegate(QStyledItemDelegate):
         )
         pixmap = self._pixmap_for(index)
         if pixmap is None or pixmap.isNull():
-            painter.fillRect(thumb_rect, QColor("#3a3a3a"))
+            painter.fillRect(thumb_rect, placeholder_color())
         else:
             scaled = pixmap.scaled(
                 thumb_rect.size(),
@@ -98,7 +124,7 @@ class ThumbnailDelegate(QStyledItemDelegate):
                 24,
             )
             painter.setBrush(QColor(0, 0, 0, 180))
-            painter.setPen(QColor("#ffffff"))
+            painter.setPen(marker_color(state) or filename_color())
             painter.drawEllipse(marker_rect)
             painter.drawText(
                 marker_rect,
@@ -123,7 +149,7 @@ class ThumbnailDelegate(QStyledItemDelegate):
                     badge_width,
                     min(18, text_rect.height()),
                 )
-                painter.setPen(QColor("#f2d27a"))
+                painter.setPen(slot_badge_color())
                 painter.drawText(
                     badge_rect,
                     int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
@@ -131,14 +157,18 @@ class ThumbnailDelegate(QStyledItemDelegate):
                 )
                 text_rect.setWidth(max(0, text_rect.width() - badge_width - 4))
             if name:
-                painter.setPen(
-                    option.palette.highlightedText().color() if selected else QColor("#dddddd")
-                )
+                painter.setPen(filename_color())
                 painter.drawText(
                     text_rect,
                     int(Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextWordWrap),
                     str(name),
                 )
+        if option.state & QStyle.StateFlag.State_HasFocus:
+            pen = QPen(QColor(TOKENS.focus))
+            pen.setWidth(TOKENS.border_width)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(option.rect.adjusted(1, 1, -2, -2))
         painter.restore()
 
     def sizeHint(self, option, index) -> QSize:

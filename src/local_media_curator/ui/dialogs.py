@@ -4,27 +4,38 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog, QInputDialog, QMessageBox, QWidget
 
+from local_media_curator.ui.theme import stylesheet
 
-def show_warning(parent: QWidget | None, title: str, text: str) -> None:
-    """Show a warning with Chinese button text set by us, not by Qt.
+
+def warning_box(parent: QWidget | None, title: str, text: str) -> QMessageBox:
+    """Warning dialog with Chinese OK and the project stylesheet.
 
     Relying on Qt's own catalogue is not safe here: loading `qt_zh_CN`
     succeeds from the source tree but fails inside the frozen EXE, which left
     English buttons in an otherwise Chinese UI. Setting the text explicitly
-    makes the result independent of packaging.
+    makes the result independent of packaging. Top-level dialogs do not inherit
+    the main window sheet, so the sheet is applied here.
     """
     box = QMessageBox(parent)
+    box.setStyleSheet(stylesheet())
+    box.setStyleSheet(stylesheet())
     box.setIcon(QMessageBox.Icon.Warning)
     box.setWindowTitle(title)
     box.setText(text)
     box.setStandardButtons(QMessageBox.StandardButton.Ok)
     box.button(QMessageBox.StandardButton.Ok).setText("确定")
-    box.exec()
+    return box
+
+
+def show_warning(parent: QWidget | None, title: str, text: str) -> None:
+    """Show a warning with Chinese button text set by us, not by Qt."""
+    warning_box(parent, title, text).exec()
 
 
 def ask_confirm(parent: QWidget | None, title: str, text: str) -> bool:
     """Yes/No confirmation in Chinese. Defaults to No. See show_warning."""
     box = QMessageBox(parent)
+    box.setStyleSheet(stylesheet())
     box.setIcon(QMessageBox.Icon.Question)
     box.setWindowTitle(title)
     box.setText(text)
@@ -47,6 +58,7 @@ def ask_text(
     still come up with English OK / Cancel buttons.
     """
     dialog = QInputDialog(parent)
+    dialog.setStyleSheet(stylesheet())
     dialog.setWindowTitle(title)
     dialog.setLabelText(label)
     dialog.setTextValue(text)
@@ -66,6 +78,7 @@ def ask_item(
 ) -> str | None:
     """Item picker with Chinese buttons. See ask_text."""
     dialog = QInputDialog(parent)
+    dialog.setStyleSheet(stylesheet())
     dialog.setWindowTitle(title)
     dialog.setLabelText(label)
     dialog.setComboBoxItems(items)
@@ -116,6 +129,7 @@ def show_import_summary(
 ) -> None:
     """Show import match counts with Chinese OK. See show_warning."""
     box = QMessageBox(parent)
+    box.setStyleSheet(stylesheet())
     box.setIcon(QMessageBox.Icon.Information)
     box.setWindowTitle("导入名单")
     box.setText(f"已匹配：{matched}\n缺失：{missing}\n歧义：{ambiguous}")

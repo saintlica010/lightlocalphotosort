@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QAbstractItemView, QListView, QVBoxLayout, QWidget
 
 from local_media_curator.media.thumbnail_schedule import PREFETCH_ROWS
 from local_media_curator.ui.media_model import MediaListModel
+from local_media_curator.ui.theme import TOKENS
 from local_media_curator.ui.thumbnail_delegate import THUMB_SIZE, ThumbnailDelegate
 
 
@@ -20,7 +21,8 @@ class MediaGrid(QWidget):
         self._view.setMovement(QListView.Movement.Static)
         self._view.setUniformItemSizes(True)
         self._view.setIconSize(QSize(THUMB_SIZE, THUMB_SIZE))
-        self._view.setSpacing(8)
+        self._view.setObjectName("mediaGrid")
+        self._view.setSpacing(TOKENS.thumbnail_spacing)
         self._view.setWordWrap(True)
         self._model = MediaListModel(parent=self)
         self._view.setModel(self._model)

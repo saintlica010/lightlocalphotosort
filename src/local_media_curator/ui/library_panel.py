@@ -46,19 +46,23 @@ class LibraryPanel(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.views = QListWidget(self)
+        self.views.setObjectName("libraryViews")
         for label in _VIEW_LABELS:
             self.views.addItem(label)
         self.views.currentRowChanged.connect(self._emit_view_changed)
         self.views.itemClicked.connect(self._on_view_clicked)
         self.sort_combo = QComboBox(self)
+        self.sort_combo.setObjectName("filterControl")
         for value, label in _SORT_OPTIONS:
             self.sort_combo.addItem(label, value)
         self.sort_combo.currentIndexChanged.connect(self._emit_sort_changed)
         self.type_combo = QComboBox(self)
+        self.type_combo.setObjectName("filterControl")
         for label, value in self._TYPE_OPTIONS:
             self.type_combo.addItem(label, value)
         self.type_combo.currentIndexChanged.connect(self._emit_filters_changed)
         self.extension_combo = QComboBox(self)
+        self.extension_combo.setObjectName("filterControl")
         for ext in self._EXTENSION_OPTIONS:
             # Extension values are data and stay verbatim.
             self.extension_combo.addItem(
@@ -66,9 +70,11 @@ class LibraryPanel(QWidget):
             )
         self.extension_combo.currentIndexChanged.connect(self._emit_filters_changed)
         self.folder_combo = QComboBox(self)
+        self.folder_combo.setObjectName("filterControl")
         self.folder_combo.addItem("任意文件夹", None)
         self.folder_combo.currentIndexChanged.connect(self._emit_filters_changed)
         self.missing_combo = QComboBox(self)
+        self.missing_combo.setObjectName("filterControl")
         for label, value in self._MISSING_OPTIONS:
             self.missing_combo.addItem(label, value)
         self.missing_combo.currentIndexChanged.connect(self._emit_filters_changed)
@@ -80,6 +86,10 @@ class LibraryPanel(QWidget):
             ("rejected", "已排除"),
         ):
             count_label = QLabel(f"{label}：0")
+            if state == "picked":
+                count_label.setObjectName("pickedCount")
+            elif state == "rejected":
+                count_label.setObjectName("rejectedCount")
             self.culling_count_labels[state] = count_label
             counts_layout.addWidget(count_label)
         self.list_panel = ListPanel(self)

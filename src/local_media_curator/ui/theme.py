@@ -1,7 +1,8 @@
 """Phase 3D design tokens and the one QSS that reads them.
 
-The running app is not migrated here. Phase 3E applies this sheet to the
-sidebar, grid, and preview. Until then, widgets keep their existing paint.
+Phase 3E applies the same sheet to the sidebar, lists, filters, grid,
+preview, menus, owned dialogs, and the status bar. Grid cards are still
+painted by the thumbnail delegate; it reads these tokens instead of literals.
 """
 
 from __future__ import annotations
@@ -136,5 +137,101 @@ QFrame#themeCard {{
   background: {t.surface_3};
   border: {t.border_width}px solid {t.border};
   border-radius: {t.radius}px;
+}}
+QMainWindow, QDialog, QMessageBox, QInputDialog {{
+  background: {t.surface_0};
+  color: {t.text};
+  font-size: {t.font_size_md}px;
+}}
+QMenuBar, QMenu, QStatusBar {{
+  background: {t.surface_1};
+  color: {t.text};
+  font-size: {t.font_size_md}px;
+}}
+QMenuBar::item:selected, QMenu::item:selected, QMenu::item:hover {{
+  background: {t.selection};
+  color: {t.text};
+}}
+QPushButton {{
+  background: {t.surface_2};
+  color: {t.text};
+  border: {t.border_width}px solid {t.border};
+  border-radius: {t.radius}px;
+  padding: {t.space_xs}px {t.space_sm}px;
+  min-height: {t.line_height}px;
+}}
+QPushButton:hover {{
+  background: {t.hover};
+}}
+QPushButton:focus, QComboBox#filterControl:focus, QLineEdit:focus {{
+  border: {t.border_width}px solid {t.focus};
+}}
+QComboBox#filterControl {{
+  background: {t.surface_2};
+  color: {t.text};
+  border: {t.border_width}px solid {t.border};
+  border-radius: {t.radius}px;
+  padding: {t.space_xs}px {t.space_sm}px;
+  min-height: {t.line_height}px;
+}}
+QComboBox#filterControl:hover {{
+  background: {t.hover};
+}}
+QComboBox QAbstractItemView {{
+  background: {t.surface_2};
+  color: {t.text};
+  selection-background-color: {t.selection};
+  selection-color: {t.text};
+}}
+QListWidget#libraryViews, QListWidget#namedLists {{
+  background: {t.surface_1};
+  color: {t.text};
+  border: {t.border_width}px solid {t.border};
+  outline: none;
+  font-size: {t.font_size_md}px;
+}}
+QListWidget#libraryViews::item, QListWidget#namedLists::item {{
+  min-height: {t.sidebar_row_height}px;
+  padding-left: {t.space_sm}px;
+  padding-right: {t.space_sm}px;
+}}
+QListWidget#libraryViews::item:hover, QListWidget#namedLists::item:hover {{
+  background: {t.hover};
+}}
+QListWidget#libraryViews::item:selected, QListWidget#namedLists::item:selected {{
+  background: {t.selection};
+  color: {t.text};
+}}
+QListWidget#libraryViews::item:focus, QListWidget#namedLists::item:focus {{
+  border: {t.border_width}px solid {t.focus};
+}}
+QListView#mediaGrid {{
+  background: {t.surface_0};
+  color: {t.text};
+  border: {t.border_width}px solid {t.border};
+  outline: none;
+}}
+QListView#mediaGrid:focus {{
+  border: {t.border_width}px solid {t.focus};
+}}
+QWidget#previewPanel {{
+  background: {t.surface_1};
+  color: {t.text};
+}}
+QGraphicsView#previewImage {{
+  background: {t.surface_0};
+  border: {t.border_width}px solid {t.border};
+}}
+QLabel#pickedCount, QLabel#previewPicked {{
+  color: {t.picked};
+}}
+QLabel#rejectedCount, QLabel#previewRejected {{
+  color: {t.rejected};
+}}
+QLabel#targetListLabel {{
+  color: {t.accent};
+}}
+QSplitter::handle {{
+  background: {t.border};
 }}
 """.strip() + "\n"
