@@ -1,11 +1,19 @@
+import hashlib
 from pathlib import Path
 
 from PIL import Image
 
+from local_media_curator.services.export_service import ExportService
 from local_media_curator.services.library_service import LibraryService
 from local_media_curator.services.list_service import ListService
 from local_media_curator.services.project_service import create_project
 from local_media_curator.ui.main_window import MainWindow
+
+
+def _fill(folder: Path, names: tuple[str, ...]) -> None:
+    folder.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        Image.new("RGB", (12, 12), "red").save(folder / name, "JPEG")
 
 
 def test_export_and_import_actions_are_chinese(qtbot) -> None:
@@ -56,4 +64,127 @@ def test_export_then_import_round_trip_via_actions(qtbot, tmp_path: Path, monkey
     )
     window.import_list_action.trigger()
     assert ListService(project).ordered_media_ids(list_id) == [ids["B.jpg"], ids["A.jpg"]]
+    project.close()
+
+
+def test_import_ui_relocates_source_root(qtbot, tmp_path: Path, monkeypatch) -> None:
+    old_project = create_project(tmp_path / "old")
+    old_root = tmp_path / "D-Photos"
+    _fill(old_root / "2026", ("A.jpg", "B.jpg"))
+    LibraryService(old_project).add_source_folder(old_root)
+    LibraryService(old_project).scan()
+    ids = {
+        str(row["file_name"]): int(row["id"])
+        for row in old_project.connection.execute("SELECT id, file_name FROM media")
+    }
+    lists = ListService(old_project)
+    list_id = lists.create("Website")
+    lists.add_items(list_id, [ids["B.jpg"], ids["A.jpg"]])
+    dest = tmp_path / "Website.llplist.json"
+    ExportService(old_project).export_list(list_id, dest)
+    old_project.close()
+
+    new_root = tmp_path / "E-Photos"
+    _fill(new_root / "2026", ("A.jpg", "B.jpg"))
+    before = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (new_root / "2026").iterdir()
+    }
+    new_project = create_project(tmp_path / "new")
+    LibraryService(new_project).add_source_folder(new_root)
+    LibraryService(new_project).scan()
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(new_project)
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.choose_open_file",
+        lambda *args, **kwargs: dest,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.choose_existing_directory",
+        lambda *args, **kwargs: new_root,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.show_import_summary",
+        lambda *args, **kwargs: None,
+    )
+    window.import_list_action.trigger()
+
+    website = next(
+        row for row in ListService(new_project).all_lists() if row["name"] == "Website"
+    )
+    names = [
+        row["file_name"]
+        for row in new_project.connection.execute(
+            """
+            SELECT media.file_name FROM list_items
+            JOIN media ON media.id = list_items.media_id
+            WHERE list_items.list_id = ?
+            ORDER BY list_items.sort_key
+            """,
+            (int(website["id"]),),
+        )
+    ]
+    assert names == ["B.jpg", "A.jpg"]
+    after = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (new_root / "2026").iterdir()
+    }
+    assert after == before
+    new_project.close()
+
+
+def test_import_ui_cancel_remap_preserves_existing_list(
+    qtbot, tmp_path: Path, monkeypatch
+) -> None:
+    project = create_project(tmp_path / "proj")
+    source = tmp_path / "camera-a"
+    _fill(source, ("A.jpg", "B.jpg"))
+    LibraryService(project).add_source_folder(source)
+    LibraryService(project).scan()
+    ids = {
+        str(row["file_name"]): int(row["id"])
+        for row in project.connection.execute("SELECT id, file_name FROM media")
+    }
+    lists = ListService(project)
+    list_id = lists.create("Website")
+    lists.add_items(list_id, [ids["B.jpg"], ids["A.jpg"]])
+    original = lists.ordered_media_ids(list_id)
+
+    dest = tmp_path / "Website.llplist.json"
+    dest.write_text(
+        "{\n"
+        '  "format": "light-local-photo-list",\n'
+        '  "version": 1,\n'
+        '  "list": {"name": "Website"},\n'
+        '  "items": [{\n'
+        '    "order": 0,\n'
+        '    "source": "other-drive",\n'
+        '    "relative_path": "GONE.jpg",\n'
+        '    "file_name": "GONE.jpg",\n'
+        '    "file_size": 12,\n'
+        '    "modified_at": "2026-01-01T00:00:00"\n'
+        "  }]\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.choose_open_file",
+        lambda *args, **kwargs: dest,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.choose_existing_directory",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "local_media_curator.ui.main_window.show_import_summary",
+        lambda *args, **kwargs: None,
+    )
+    window.import_list_action.trigger()
+    assert ListService(project).ordered_media_ids(list_id) == original
     project.close()

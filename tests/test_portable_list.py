@@ -49,6 +49,31 @@ def test_from_json_rejects_wrong_format() -> None:
         from_json('{"format": "other", "version": 1, "list": {"name": "A"}, "items": []}')
 
 
+@pytest.mark.parametrize("missing_key", ["order", "source", "relative_path", "file_name"])
+def test_from_json_missing_item_key_raises_value_error(missing_key: str) -> None:
+    item = {
+        "order": 0,
+        "source": "src",
+        "relative_path": "A.jpg",
+        "file_name": "A.jpg",
+        "file_size": 1,
+        "modified_at": "2026-01-01T00:00:00",
+    }
+    del item[missing_key]
+    text = json.dumps(
+        {
+            "format": "light-local-photo-list",
+            "version": 1,
+            "list": {"name": "A"},
+            "items": [item],
+        }
+    )
+    with pytest.raises(ValueError, match="名单文件缺少必要字段") as exc_info:
+        from_json(text)
+    assert not isinstance(exc_info.value, KeyError)
+    assert exc_info.type is ValueError
+
+
 def test_from_json_accepts_optional_absolute_path() -> None:
     text = json.dumps(
         {

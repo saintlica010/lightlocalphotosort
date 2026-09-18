@@ -17,6 +17,14 @@ from local_media_curator.services.list_service import ListService
 
 
 @dataclass
+class MatchResult:
+    name: str
+    matched_ids: list[int]
+    missing: list[PortableItem]
+    ambiguous: list[PortableItem]
+
+
+@dataclass
 class ImportResult:
     list_id: int
     matched: int
@@ -119,9 +127,10 @@ class ExportService:
         destination.write_text(to_json(document), encoding="utf-8")
         return document
 
-    def import_list(
+    def match_list(
         self, path: Path, remaps: dict[str, Path] | None = None
-    ) -> ImportResult:
+    ) -> MatchResult:
+        """Match manifest items to media ids without writing lists or list_items."""
         document = from_json(Path(path).read_text(encoding="utf-8"))
         remaps = remaps or {}
 
@@ -142,13 +151,24 @@ class ExportService:
             else:
                 missing.append(item)
 
-        list_id = self._lists.create(document.name)
-        self._lists.replace_items(list_id, matched_ids)
-        return ImportResult(
-            list_id=list_id,
-            matched=len(matched_ids),
+        return MatchResult(
+            name=document.name,
+            matched_ids=matched_ids,
             missing=missing,
             ambiguous=ambiguous,
+        )
+
+    def import_list(
+        self, path: Path, remaps: dict[str, Path] | None = None
+    ) -> ImportResult:
+        match = self.match_list(path, remaps=remaps)
+        list_id = self._lists.create(match.name)
+        self._lists.replace_items(list_id, match.matched_ids)
+        return ImportResult(
+            list_id=list_id,
+            matched=len(match.matched_ids),
+            missing=match.missing,
+            ambiguous=match.ambiguous,
         )
 
     def _match_item(

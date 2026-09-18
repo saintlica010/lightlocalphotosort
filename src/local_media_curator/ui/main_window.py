@@ -874,22 +874,26 @@ class MainWindow(QMainWindow):
         path = choose_open_file(self, "导入名单", _PORTABLE_LIST_FILTER)
         if path is None:
             return
+        service = ExportService(self.project)
         try:
-            result = ExportService(self.project).import_list(path)
-            if result.missing:
-                remaps: dict[str, Path] = {}
+            match = service.match_list(path)
+            remaps: dict[str, Path] = {}
+            if match.missing or match.ambiguous:
                 for source in sorted(
-                    {item.source for item in result.missing}
+                    {
+                        item.source
+                        for item in (*match.missing, *match.ambiguous)
+                    }
                 ):
                     chosen = choose_existing_directory(
                         self, f"为源 {source} 选择新根目录"
                     )
                     if chosen is not None:
                         remaps[source] = chosen
-                if remaps:
-                    result = ExportService(self.project).import_list(
-                        path, remaps=remaps
-                    )
+                if not remaps:
+                    # Remap required but every dialog was cancelled — do not wipe.
+                    return
+            result = service.import_list(path, remaps=remaps or None)
         except ValueError as exc:
             show_warning(self, "无法导入", str(exc))
             return
