@@ -1,6 +1,7 @@
 import hashlib
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from local_media_curator.domain.lightroom_smart_collection import (
@@ -85,14 +86,40 @@ def test_render_large_list_is_deterministic() -> None:
     assert render_lrsmcol("big", list(reversed(stems))) == first
 
 
-def test_lightroom_export_empty_list(tmp_path: Path) -> None:
+def test_lightroom_export_empty_list_rejected(tmp_path: Path) -> None:
     project, _source = _project(tmp_path, {"A.jpg": "jpeg"})
     list_id = ListService(project).create("空名单")
     destination = tmp_path / "空名单.lrsmcol"
-    ExportService(project).export_lightroom_smart_collection(list_id, destination)
-    text = destination.read_text(encoding="utf-8")
-    assert 'criteria = "filename"' not in text
-    assert 'combine = "union"' in text
+    with pytest.raises(ValueError, match="没有可用于 Lightroom RAW 匹配的 JPEG 文件"):
+        ExportService(project).export_lightroom_smart_collection(list_id, destination)
+    assert not destination.exists()
+    project.close()
+
+
+def test_lightroom_export_non_jpeg_only_list_rejected(tmp_path: Path) -> None:
+    project, _source = _project(
+        tmp_path, {"note.png": b"png", "scan.tif": b"tiff"}
+    )
+    rows = list(project.connection.execute("SELECT id FROM media"))
+    list_id = ListService(project).create("非 JPEG")
+    ListService(project).add_items(list_id, [int(row[0]) for row in rows])
+    destination = tmp_path / "非 JPEG.lrsmcol"
+    with pytest.raises(ValueError, match="没有可用于 Lightroom RAW 匹配的 JPEG 文件"):
+        ExportService(project).export_lightroom_smart_collection(list_id, destination)
+    assert not destination.exists()
+    project.close()
+
+
+def test_lightroom_export_failure_does_not_create_file(tmp_path: Path) -> None:
+    project, _source = _project(tmp_path, {"A.png": b"png"})
+    list_id = ListService(project).create("RAW")
+    media_id = int(project.connection.execute("SELECT id FROM media").fetchone()[0])
+    ListService(project).add_items(list_id, [media_id])
+    destination = tmp_path / "nested" / "RAW.lrsmcol"
+    with pytest.raises(ValueError):
+        ExportService(project).export_lightroom_smart_collection(list_id, destination)
+    assert not destination.exists()
+    assert not destination.parent.exists()
     project.close()
 
 

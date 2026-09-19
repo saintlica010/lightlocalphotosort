@@ -132,6 +132,10 @@ class ExportService:
         if match is None:
             raise ValueError("名单不存在。")
         stems = unique_jpeg_stems([str(row["file_name"]) for row in rows])
+        if not stems:
+            raise ValueError(
+                "当前名单中没有可用于 Lightroom RAW 匹配的 JPEG 文件。"
+            )
         destination = Path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
