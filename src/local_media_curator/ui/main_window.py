@@ -293,6 +293,18 @@ class MainWindow(QMainWindow):
     def add_selection_to_list(self, list_id: int) -> None:
         self.add_items_to_list(list_id, self.media_grid.selected_ids())
 
+    def _bound_quick_slot_list_id(self, slot: int) -> int | None:
+        if self.list_service is None:
+            return None
+        list_id = self.list_service.quick_slot_list_id(slot)
+        if list_id is not None:
+            return list_id
+        self.statusBar().showMessage(
+            f"快捷键 {slot} 尚未绑定。请在左侧名单上右键或点「绑定快捷键」。",
+            6000,
+        )
+        return None
+
     def add_selection_to_quick_slot(self, slot: int) -> None:
         if not self._curation_shortcut_allowed():
             return
@@ -301,7 +313,9 @@ class MainWindow(QMainWindow):
         media_ids = self.media_grid.selected_ids()
         if not media_ids:
             return
-        list_id = self.list_service.ensure_quick_slot(slot)
+        list_id = self._bound_quick_slot_list_id(slot)
+        if list_id is None:
+            return
         self.add_items_to_list(list_id, media_ids)
 
     def add_selection_to_quick_slot_and_advance(self, slot: int) -> None:
@@ -314,7 +328,9 @@ class MainWindow(QMainWindow):
             return
         visible_ids = self._visible_media_ids()
         advance_to = self._next_visible_id(visible_ids, media_ids)
-        list_id = self.list_service.ensure_quick_slot(slot)
+        list_id = self._bound_quick_slot_list_id(slot)
+        if list_id is None:
+            return
         existing = set(self.list_service.ordered_media_ids(list_id))
         missing = [media_id for media_id in media_ids if media_id not in existing]
         if missing and not self._run_curation(
@@ -1280,7 +1296,11 @@ class MainWindow(QMainWindow):
         )
         if not allowed:
             return
-        self.list_service.delete(list_id)
+        try:
+            self.list_service.delete(list_id)
+        except sqlite3.Error as exc:
+            show_warning(self, "无法删除名单", str(exc))
+            return
         if self._current_list_id == list_id:
             self.show_library_view("all")
             return

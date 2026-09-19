@@ -58,6 +58,8 @@ def test_shift_number_adds_and_advances(qtbot, tmp_path: Path) -> None:
     first = _visible_id(window, 0)
     second = _visible_id(window, 1)
     window._select_media_ids([first])
+    list_id = window.list_service.create("网站")
+    window.list_service.bind_quick_slot(7, list_id)
     window.quick_slot_shift_actions[6].trigger()
     list_id = window.list_service.quick_slot_list_id(7)
     assert list_id is not None
@@ -73,6 +75,8 @@ def test_shift_number_advances_when_already_member(qtbot, tmp_path: Path) -> Non
     first = _visible_id(window, 0)
     second = _visible_id(window, 1)
     window._select_media_ids([first])
+    list_id = window.list_service.create("网站")
+    window.list_service.bind_quick_slot(1, list_id)
     window.quick_slot_actions[0].trigger()
     list_id = window.list_service.quick_slot_list_id(1)
     window._select_media_ids([first])
@@ -188,8 +192,12 @@ def test_list_context_menu_offers_bind_and_clear(qtbot, tmp_path: Path) -> None:
     titles = [action.text() for action in menu.actions()]
     assert "绑定快捷键" in titles
     assert "取消快捷键" in titles
+    assert "删除名单" in titles
     bind = next(action.menu() for action in menu.actions() if action.text() == "绑定快捷键")
-    assert [action.text() for action in bind.actions()] == [str(n) for n in range(1, 10)]
+    labels = [action.text() for action in bind.actions()]
+    assert labels[0] == "1  未绑定"
+    assert labels[1] == "2  备用"
+    assert bind.actions()[1].isChecked()
     project.close()
 
 

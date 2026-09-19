@@ -147,23 +147,36 @@ def test_rebind_moves_slot_without_changing_membership(tmp_path: Path) -> None:
     project.close()
 
 
-def test_number_key_auto_creates_and_adds(qtbot, tmp_path: Path) -> None:
+def test_unbound_number_key_does_not_create_list(qtbot, tmp_path: Path) -> None:
     project, ids = _setup(tmp_path, ("A.jpg",))
     window = _window(qtbot, project)
     window._select_media_ids([ids["A.jpg"]])
     window.quick_slot_actions[3].trigger()
-    list_id = window.list_service.quick_slot_list_id(4)
-    assert list_id is not None
-    names = {int(row["id"]): str(row["name"]) for row in window.list_service.all_lists()}
-    assert names[list_id] == "快捷名单 4"
+    assert window.list_service.all_lists() == []
+    assert window.list_service.quick_slot_list_id(4) is None
+    assert "尚未绑定" in window.statusBar().currentMessage()
+    project.close()
+
+
+def test_number_key_adds_to_user_bound_list(qtbot, tmp_path: Path) -> None:
+    project, ids = _setup(tmp_path, ("A.jpg",))
+    window = _window(qtbot, project)
+    list_id = window.list_service.create("网站")
+    window.list_service.bind_quick_slot(4, list_id)
+    window._select_media_ids([ids["A.jpg"]])
+    window.quick_slot_actions[3].trigger()
     assert window.list_service.ordered_media_ids(list_id) == [ids["A.jpg"]]
-    assert window.quick_slot_actions[3].shortcut() == QKeySequence("4")
+    names = {int(row["id"]): str(row["name"]) for row in window.list_service.all_lists()}
+    assert names[list_id] == "网站"
+    assert "快捷名单 4" not in names.values()
     project.close()
 
 
 def test_number_key_is_idempotent(qtbot, tmp_path: Path) -> None:
     project, ids = _setup(tmp_path, ("A.jpg",))
     window = _window(qtbot, project)
+    list_id = window.list_service.create("网站")
+    window.list_service.bind_quick_slot(3, list_id)
     window._select_media_ids([ids["A.jpg"]])
     window.quick_slot_actions[2].trigger()
     list_id = window.list_service.quick_slot_list_id(3)
@@ -175,9 +188,26 @@ def test_number_key_is_idempotent(qtbot, tmp_path: Path) -> None:
     project.close()
 
 
+def test_deleted_quick_list_stays_gone_when_number_pressed(qtbot, tmp_path: Path) -> None:
+    project, ids = _setup(tmp_path, ("A.jpg",))
+    window = _window(qtbot, project)
+    list_id = window.list_service.create("快捷名单 1")
+    window.list_service.bind_quick_slot(1, list_id)
+    window.confirm_delete = lambda _name: True
+    window._on_delete_list(list_id)
+    assert window.list_service.all_lists() == []
+    window._select_media_ids([ids["A.jpg"]])
+    window.quick_slot_actions[0].trigger()
+    assert window.list_service.all_lists() == []
+    assert window.list_service.quick_slot_list_id(1) is None
+    project.close()
+
+
 def test_number_key_adds_multi_selection_as_one_undo(qtbot, tmp_path: Path) -> None:
     project, ids = _setup(tmp_path)
     window = _window(qtbot, project)
+    list_id = window.list_service.create("网站")
+    window.list_service.bind_quick_slot(1, list_id)
     window._select_media_ids([ids["A.jpg"], ids["B.jpg"], ids["C.jpg"]])
     before = window.undo_stack._stack.count()
     window.quick_slot_actions[0].trigger()

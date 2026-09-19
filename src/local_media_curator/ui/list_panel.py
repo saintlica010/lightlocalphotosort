@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from local_media_curator.ui.dialogs import ask_text
+from local_media_curator.ui.dialogs import ask_item, ask_text
 
 
 class ListPanel(QWidget):
@@ -37,10 +37,13 @@ class ListPanel(QWidget):
         self.rename_button = QPushButton("重命名")
         self.delete_button = QPushButton("删除")
         self.set_target_button = QPushButton("设为目标名单")
+        self.bind_button = QPushButton("绑定快捷键")
+        self._list_rows: list[Mapping[str, object]] = []
         self.new_button.clicked.connect(self._on_new)
         self.rename_button.clicked.connect(self._on_rename)
         self.delete_button.clicked.connect(self._on_delete)
         self.set_target_button.clicked.connect(self._on_set_target)
+        self.bind_button.clicked.connect(self._on_bind_button)
         self.lists_widget.currentItemChanged.connect(self._on_current_changed)
         self.lists_widget.itemClicked.connect(self._on_item_clicked)
         self.lists_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -58,6 +61,7 @@ class ListPanel(QWidget):
         layout.addWidget(self.target_label)
         layout.addWidget(self.lists_widget, stretch=1)
         layout.addLayout(buttons)
+        layout.addWidget(self.bind_button)
         layout.addWidget(self.set_target_button)
 
     def set_target_list(self, name: str | None) -> None:
@@ -68,6 +72,7 @@ class ListPanel(QWidget):
 
     def set_lists(self, rows: Sequence[Mapping[str, object]]) -> None:
         current_id = self.selected_list_id()
+        self._list_rows = [dict(row) for row in rows]
         self.lists_widget.clear()
         restore: QListWidgetItem | None = None
         for row in rows:
@@ -129,11 +134,46 @@ class ListPanel(QWidget):
         value = current.data(Qt.ItemDataRole.UserRole)
         self.current_list_changed.emit(int(value) if value is not None else None)
 
+    def slot_choice_labels(self) -> list[str]:
+        return [self._slot_label(slot) for slot in range(1, 10)]
+
+    def _slot_label(self, slot: int) -> str:
+        occupant = next(
+            (
+                str(row.get("name") or "")
+                for row in self._list_rows
+                if row.get("quick_slot") == slot
+            ),
+            None,
+        )
+        return f"{slot}  {occupant}" if occupant else f"{slot}  未绑定"
+
+    def _on_bind_button(self) -> None:
+        list_id = self.selected_list_id()
+        if list_id is None:
+            return
+        labels = self.slot_choice_labels()
+        chosen = ask_item(self, "绑定快捷键", "快捷键：", labels)
+        if not chosen:
+            return
+        slot = int(str(chosen).split()[0])
+        self.bind_slot_requested.emit(list_id, slot)
+
     def context_menu_for(self, list_id: int) -> QMenu:
         menu = QMenu(self)
         bind_menu = menu.addMenu("绑定快捷键")
+        current_slot = next(
+            (
+                row.get("quick_slot")
+                for row in self._list_rows
+                if int(row["id"]) == list_id
+            ),
+            None,
+        )
         for slot in range(1, 10):
-            action = QAction(str(slot), bind_menu)
+            action = QAction(self._slot_label(slot), bind_menu)
+            action.setCheckable(True)
+            action.setChecked(current_slot == slot)
             action.triggered.connect(
                 lambda _checked=False, slot=slot, list_id=list_id: self.bind_slot_requested.emit(
                     list_id, slot
@@ -145,6 +185,11 @@ class ListPanel(QWidget):
             lambda _checked=False, list_id=list_id: self.unbind_slot_requested.emit(list_id)
         )
         menu.addAction(clear)
+        delete = QAction("删除名单", menu)
+        delete.triggered.connect(
+            lambda _checked=False, list_id=list_id: self.delete_requested.emit(list_id)
+        )
+        menu.addAction(delete)
         export = QAction("导出 Lightroom 智能收藏夹（实验性）...", menu)
         export.triggered.connect(
             lambda _checked=False, list_id=list_id: self.lightroom_export_requested.emit(list_id)
