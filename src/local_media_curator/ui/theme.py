@@ -218,6 +218,13 @@ QWidget#previewPanel {{
   background: {t.surface_1};
   color: {t.text};
 }}
+QLabel#previewFieldLabel {{
+  color: {t.text_muted};
+  font-weight: {t.font_weight_medium};
+}}
+QLabel#previewValue {{
+  color: {t.text};
+}}
 QGraphicsView#previewImage {{
   background: {t.surface_0};
   border: {t.border_width}px solid {t.border};
@@ -227,6 +234,9 @@ QLabel#pickedCount, QLabel#previewPicked {{
 }}
 QLabel#rejectedCount, QLabel#previewRejected {{
   color: {t.rejected};
+}}
+QLabel#previewUndecided {{
+  color: {t.text_muted};
 }}
 QLabel#targetListLabel {{
   color: {t.accent};

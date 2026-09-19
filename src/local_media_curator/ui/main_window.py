@@ -51,7 +51,6 @@ from local_media_curator.ui.media_grid import MediaGrid
 from local_media_curator.ui.media_model import MediaListModel
 from local_media_curator.ui.preview_panel import PreviewPanel
 from local_media_curator.ui.theme import stylesheet
-from local_media_curator.ui.theme_prototype import open_theme_prototype
 
 _LIBRARY_VIEW_ROWS = {
     "all": 0,
@@ -844,13 +843,6 @@ class MainWindow(QMainWindow):
                 edit_menu.addAction(item)
             self.quick_slot_actions.append(action)
             self.quick_slot_shift_actions.append(shift)
-
-        self.theme_prototype_action = QAction("设计样板...", self)
-        self.theme_prototype_action.triggered.connect(
-            lambda _checked=False: open_theme_prototype(self)
-        )
-        edit_menu.addSeparator()
-        edit_menu.addAction(self.theme_prototype_action)
 
     def _set_project_actions_enabled(self, enabled: bool) -> None:
         self.add_source_action.setEnabled(enabled)

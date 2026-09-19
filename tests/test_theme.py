@@ -63,7 +63,6 @@ def test_prototype_uses_tokens_without_touching_main_window(qtbot) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
     assert window.styleSheet() == stylesheet()
-    assert window.theme_prototype_action.text() == "设计样板..."
     prototype = ThemePrototype()
     qtbot.addWidget(prototype)
     sheet = prototype.styleSheet()
@@ -73,3 +72,14 @@ def test_prototype_uses_tokens_without_touching_main_window(qtbot) -> None:
     assert prototype.rejected.text() == "× 已排除"
     assert prototype.picked.objectName() != prototype.rejected.objectName()
     assert prototype.field.objectName() == "themeField"
+
+
+def test_production_edit_menu_does_not_expose_theme_prototype(qtbot) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    edit = next(
+        action.menu()
+        for action in window.menuBar().actions()
+        if action.text() == "编辑"
+    )
+    assert all("设计样板" not in action.text() for action in edit.actions())

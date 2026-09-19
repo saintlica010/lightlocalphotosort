@@ -19,6 +19,18 @@ from local_media_curator.media.image_loader import DEFAULT_PREVIEW_MAX_EDGE
 from local_media_curator.media.preview_loader import PreviewLoader, open_path
 
 
+def _field_label(text: str) -> QLabel:
+    label = QLabel(text)
+    label.setObjectName("previewFieldLabel")
+    return label
+
+
+def _value_label() -> QLabel:
+    label = QLabel()
+    label.setObjectName("previewValue")
+    return label
+
+
 class ImageView(QGraphicsView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -77,27 +89,27 @@ class PreviewPanel(QWidget):
         self.setObjectName("previewPanel")
         self.image_view = ImageView(self)
         self.image_view.setObjectName("previewImage")
-        self.file_name_label = QLabel()
-        self.path_label = QLabel()
-        self.dimensions_label = QLabel()
-        self.size_label = QLabel()
-        self.captured_at_label = QLabel()
-        self.modified_at_label = QLabel()
-        self.lists_label = QLabel()
-        self.culling_state_label = QLabel()
+        self.file_name_label = _value_label()
+        self.path_label = _value_label()
+        self.dimensions_label = _value_label()
+        self.size_label = _value_label()
+        self.captured_at_label = _value_label()
+        self.modified_at_label = _value_label()
+        self.lists_label = _value_label()
+        self.culling_state_label = _value_label()
         self.path_label.setWordWrap(True)
         self.path_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
         form = QFormLayout()
-        form.addRow("文件名", self.file_name_label)
-        form.addRow("路径", self.path_label)
-        form.addRow("尺寸", self.dimensions_label)
-        form.addRow("大小", self.size_label)
-        form.addRow("拍摄时间", self.captured_at_label)
-        form.addRow("修改时间", self.modified_at_label)
-        form.addRow("名单", self.lists_label)
-        form.addRow("整理状态", self.culling_state_label)
+        form.addRow(_field_label("文件名"), self.file_name_label)
+        form.addRow(_field_label("路径"), self.path_label)
+        form.addRow(_field_label("尺寸"), self.dimensions_label)
+        form.addRow(_field_label("大小"), self.size_label)
+        form.addRow(_field_label("拍摄时间"), self.captured_at_label)
+        form.addRow(_field_label("修改时间"), self.modified_at_label)
+        form.addRow(_field_label("名单"), self.lists_label)
+        form.addRow(_field_label("整理状态"), self.culling_state_label)
         layout = QVBoxLayout(self)
         layout.addWidget(self.image_view, stretch=1)
         layout.addLayout(form)
@@ -133,7 +145,10 @@ class PreviewPanel(QWidget):
         self.lists_label.setText(_format_lists(lists))
         self.culling_state_label.setText(state_label)
         self.culling_state_label.setObjectName(
-            {"picked": "previewPicked", "rejected": "previewRejected"}.get(state, "")
+            {
+                "picked": "previewPicked",
+                "rejected": "previewRejected",
+            }.get(state, "previewUndecided")
         )
         self._load_preview(path_value)
 
@@ -153,7 +168,7 @@ class PreviewPanel(QWidget):
         self.modified_at_label.clear()
         self.lists_label.clear()
         self.culling_state_label.clear()
-        self.culling_state_label.setObjectName("")
+        self.culling_state_label.setObjectName("previewValue")
         self.image_view.set_image(None)
 
     def _load_preview(self, path_value: object) -> None:

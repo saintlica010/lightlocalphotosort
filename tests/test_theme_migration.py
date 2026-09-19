@@ -88,6 +88,19 @@ def test_preview_state_label_uses_distinct_names(qtbot) -> None:
     assert panel.culling_state_label.objectName() == "previewRejected"
 
 
+def test_preview_metadata_uses_explicit_dark_theme_contrast(qtbot) -> None:
+    panel = PreviewPanel()
+    qtbot.addWidget(panel)
+    panel.set_media({"file_name": "a.jpg", "culling_state": "undecided"})
+    assert panel.file_name_label.objectName() == "previewValue"
+    assert panel.culling_state_label.objectName() == "previewUndecided"
+    sheet = stylesheet()
+    assert "QLabel#previewFieldLabel" in sheet
+    assert "QLabel#previewValue" in sheet
+    assert f"color: {TOKENS.text};" in sheet
+    assert f"color: {TOKENS.text_muted};" in sheet
+
+
 def test_owned_dialogs_take_the_project_sheet(qtbot) -> None:
     box = warning_box(None, "标题", "正文")
     qtbot.addWidget(box)
