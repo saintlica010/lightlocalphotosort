@@ -8,11 +8,13 @@ This is **not** a general-purpose DAM. Processing stays on the machine. Source m
 
 Phase 1 MVP plus Phase 2 keyboard-first culling and portable lists on Windows 10/11: create or open a project, add a source folder, scan, cull with P/X/U, assign to a Target List with B, maintain virtual lists, and export lists as `.llplist.json`, CSV, TXT, or clipboard text.
 
-Phase 3 adds persistent quick-list slots 1–9, a dark token theme, and an experimental Lightroom Classic `.lrsmcol` export. Source files, XMP, and `.lrcat` catalogs are still never written. A real Lightroom import and the packaged EXE workflow are local checks, not part of the automated suite.
+Phase 3 adds persistent quick-list slots 1–9, a dark token theme, and an experimental Lightroom Classic `.lrsmcol` export. Source files, XMP, and `.lrcat` catalogs are still never written. Empty or non-JPEG lists are rejected before an export file is created. The Windows automated suite and packaged EXE launch/exit have been verified; the full packaged workflow and real Lightroom import remain local acceptance checks.
 
 Stack: Python 3.12+, PySide6, SQLite, Pillow. Windows packaging is a one-folder PyInstaller build.
 
-See `AGENTS.md` for product rules, data-safety constraints, and the Phase 1 build order.
+See `AGENTS.md` for product rules and data-safety constraints, and
+`docs/PHASE3_PLAN.md` for the active Phase 3 implementation and verification
+gates.
 
 ## Requirements
 

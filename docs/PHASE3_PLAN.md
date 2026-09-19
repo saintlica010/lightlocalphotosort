@@ -1222,6 +1222,7 @@ Phase 3 may merge only when all **repository-owned** requirements are satisfied.
 - [x] No source media is modified
 - [x] No XMP is written
 - [x] No Lightroom catalog is modified
+- [x] Empty and non-JPEG-only lists are rejected before output creation
 - [ ] Packaged EXE can generate `.lrsmcol`
 
 ## UI
@@ -1231,16 +1232,18 @@ Phase 3 may merge only when all **repository-owned** requirements are satisfied.
 - [x] Keyboard focus is clearly visible
 - [x] Picked / Rejected / selected states remain clear
 - [x] Simplified Chinese requirement is preserved
+- [x] Production UI does not expose the development theme prototype
+- [x] Preview metadata labels and values remain readable in the dark theme
 - [x] 1k / 10k GUI smoke has no meaningful structural regression
 
 ## Regression / safety
 
-- [ ] Full automated suite passes
-- [ ] Phase 1 regression requirements pass
-- [ ] Phase 2 regression requirements pass
+- [x] Full automated suite passes on Windows Python 3.12 (`280 passed`)
+- [x] Phase 1 regression requirements pass in the automated suite
+- [x] Phase 2 regression requirements pass in the automated suite
 - [x] Source-media immutability holds
 - [x] Protected data is absent from Git
-- [ ] Protected data is absent from packaged build
+- [x] Protected data is absent from packaged build
 - [ ] Windows packaged-EXE smoke passes
 - [ ] Independent review is complete
 
@@ -1259,10 +1262,23 @@ run. `git ls-files` shows nothing under `photos/`, `phototakeplan/`, or
 `lightphotosprt/`. Spec tests confirm `datas=[]` and that those trees are not
 named in `build/local_media_curator.spec`.
 
-Left open on purpose: packaged EXE generation and smoke, protected-data check
-of a built package, the full-suite checkbox (the Windows path test did not
-pass here), Phase 1/2 boxes (they include the Windows package), independent
-review, and Lightroom Classic import.
+At the time of this historical Linux run, the following were left open:
+packaged EXE generation and smoke, protected-data check of a built package,
+the full-suite checkbox (the Windows path test did not pass there), Phase 1/2
+boxes, independent review, and Lightroom Classic import. See the final
+Windows verification below for the current repository-owned evidence.
+
+### Final Windows verification (not a merge)
+
+The historical Linux record above is superseded for current Windows evidence
+by `docs/verification/phase3_windows_smoke.md`. The verified code revision is
+`4c38d0dcf6092c6cf5b3f756f51715013262c3c4` on `codex/phase3`. It records
+`280 passed`, the
+populated 10k/9-slot structural regression, a successful clean PyInstaller
+build, an EXE launch and normal exit, and a package/Git protected-data audit.
+It deliberately leaves the interactive packaged workflow, packaged
+`.lrsmcol` generation, independent review, and Lightroom Classic import
+unchecked.
 
 ---
 

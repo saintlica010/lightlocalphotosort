@@ -84,7 +84,20 @@ list membership, and export are unchanged.
 
 ## Phase 3F closeout
 
-Checked merge-gate boxes in `docs/PHASE3_PLAN.md` are only items this Linux run actually passed. Not built: the Windows EXE, so packaged-smoke boxes stay open. Not claimed: Lightroom Classic import, or independent review. The full-suite box stays open because `test_windows_case_insensitive_overlap` still fails on a case-sensitive disk; that failure predates Phase 3.
+The older Linux closeout remains historical. The final Windows evidence is
+recorded in `docs/verification/phase3_windows_smoke.md` and supersedes that
+run for Windows claims: the complete Python 3.12 suite passed, the populated
+quick-list 10k structural regression passed, a clean one-folder EXE built and
+started/exited normally, and the packaged output contained no protected data.
+The full interactive packaged workflow, packaged `.lrsmcol` export, and real
+Lightroom Classic import remain unclaimed; Lightroom import is non-blocking.
+
+## Preview metadata contrast
+
+Preview field labels and values use separate object names so the centralized
+dark-theme stylesheet can apply `TOKENS.text_muted` to field names and
+high-contrast `TOKENS.text` to values. Picked and rejected state values retain
+their distinct state tokens; no source media or metadata is involved.
 
 ## Windows packaging ICU isolation
 

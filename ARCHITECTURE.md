@@ -121,4 +121,10 @@ Slots `1..9` are `project_settings` keys `quick_list_slot_1` … `quick_list_slo
 
 ## Phase 3 closeout
 
-Automated verification on Linux (Python 3.13.5, offscreen Qt) at `af90cbf`: 270 passed, 1 skipped because PyInstaller is not installed, 1 failed. The failure is `test_windows_case_insensitive_overlap` on a case-sensitive filesystem. 1k and 10k GUI smoke ran in that suite. No Windows EXE was built here. `datas=[]` in the spec is covered by `tests/test_packaging.py`.
+The final Windows verification is recorded in
+`docs/verification/phase3_windows_smoke.md`. It covers the full Python 3.12
+suite, the populated quick-list 10k structural regression, a clean one-folder
+PyInstaller build, EXE startup/normal exit, and a protected-data audit. The
+packaged interactive quick-list and `.lrsmcol` workflow remain separate
+manual acceptance items; Lightroom Classic itself is intentionally not
+launched.
