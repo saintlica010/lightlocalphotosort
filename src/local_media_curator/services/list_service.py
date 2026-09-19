@@ -171,16 +171,7 @@ class ListService:
                 return
 
     def quick_slots_for_media_ids(self, media_ids: list[int]) -> dict[int, list[int]]:
-        wanted = {int(media_id) for media_id in media_ids}
-        result = {int(media_id): [] for media_id in media_ids}
-        for slot in range(1, 10):
-            list_id = self.quick_slot_list_id(slot)
-            if list_id is None:
-                continue
-            for media_id in self.ordered_media_ids(list_id):
-                if media_id in wanted:
-                    result[media_id].append(slot)
-        return result
+        return self._lists.quick_slots_for_media_ids(media_ids)
 
     def all_lists(self) -> list[dict[str, object]]:
         slots = self.quick_slots_by_list_id()

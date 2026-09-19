@@ -23,7 +23,9 @@ from local_media_curator.media.thumbnail_schedule import MAX_PENDING
 from local_media_curator.services.list_service import ListService
 from local_media_curator.services.project_service import create_project
 from local_media_curator.ui.main_window import MainWindow
+from local_media_curator.ui.media_model import MediaListModel
 from local_media_curator.ui.pixmap_cache import BoundedPixmapCache, PIXMAP_CACHE_LIMIT
+from local_media_curator.ui.thumbnail_delegate import ThumbnailDelegate
 
 SIZES = (1_000, 10_000)
 
@@ -133,7 +135,7 @@ def test_reload_does_not_do_per_row_filesystem_work(
 
 def test_reload_does_not_do_per_row_list_membership_sql(big_window) -> None:
     window, _project, _ids, count = big_window
-    queries = _install_sql_probe(window.list_service._lists, "list_items")
+    queries = _install_sql_probe(window.list_service._lists, "JOIN lists")
     window.refresh()
     # Ids are chunked at 400 per statement, so the count scales as n/400 rather
     # than n. The property under test is the chunking, not a magic constant:
@@ -237,3 +239,63 @@ def test_filtered_named_list_keeps_reorder_disabled_at_scale(
     ):
         assert not action.isEnabled()
     assert window.statusBar().currentMessage() == "名单（已筛选，排序已禁用）"
+
+
+def test_10k_main_window_with_populated_quick_lists_stays_structural(qtbot, tmp_path):
+    """Exercise the real refresh path with nine large quick-list memberships."""
+    project = create_project(tmp_path / "quick-10k")
+    ids = _fill(project, 10_000)
+    lists = ListService(project)
+    stamp = "2026-01-01T00:00:00"
+    for slot in range(1, 10):
+        list_id = lists.create(f"快捷回归 {slot}")
+        lists.bind_quick_slot(slot, list_id)
+        start = (slot - 1) * 500
+        rows = [
+            (list_id, ids[start + offset], (offset + 1) * 1024, stamp)
+            for offset in range(5_000)
+        ]
+        project.connection.executemany(
+            """
+            INSERT INTO list_items (list_id, media_id, sort_key, added_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            rows,
+        )
+    project.connection.commit()
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.set_project(project)
+    try:
+        assert window.media_grid.model.rowCount() == 10_000
+        row = window.media_grid.model.row_at(1_000)
+        assert row is not None
+        assert row["quick_slots"] == [1, 2, 3]
+        assert window.media_grid.model.data(
+            window.media_grid.model.index(1_000), MediaListModel.QuickSlotsRole
+        ) == [1, 2, 3]
+        assert isinstance(window.media_grid.view.itemDelegate(), ThumbnailDelegate)
+        assert len(window.thumbnail_pool.pending_ids()) + len(
+            window.thumbnail_pool.inflight_ids()
+        ) <= MAX_PENDING + 8
+
+        connection = window.list_service._lists._conn
+        real_connection = connection
+        queries: list[str] = []
+
+        class _Probe:
+            def execute(self, sql, parameters=()):
+                text = str(sql)
+                if "quick_list_slot" in text:
+                    queries.append(text)
+                return real_connection.execute(sql, parameters)
+
+            def __getattr__(self, name: str):
+                return getattr(real_connection, name)
+
+        window.list_service._lists._conn = _Probe()  # type: ignore[assignment]
+        window.refresh()
+        assert len(queries) <= math.ceil(10_000 / _IN_CHUNK)
+    finally:
+        project.close()

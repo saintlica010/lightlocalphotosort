@@ -476,3 +476,29 @@ class ListRepository:
             for row in rows:
                 mapping[int(row[0])].append(str(row[1]))
         return mapping
+
+    def quick_slots_for_media_ids(self, media_ids: list[int]) -> dict[int, list[int]]:
+        """Resolve all configured quick-slot memberships in bounded SQL batches."""
+        mapping: dict[int, list[int]] = {int(media_id): [] for media_id in media_ids}
+        unique_ids = list(dict.fromkeys(int(media_id) for media_id in media_ids))
+        for start in range(0, len(unique_ids), _IN_CHUNK):
+            chunk = unique_ids[start : start + _IN_CHUNK]
+            if not chunk:
+                continue
+            placeholders = ",".join("?" * len(chunk))
+            rows = self._conn.execute(
+                f"""
+                SELECT list_items.media_id,
+                       CAST(substr(project_settings.key, 17) AS INTEGER) AS slot
+                FROM list_items
+                JOIN project_settings
+                  ON project_settings.value = CAST(list_items.list_id AS TEXT)
+                WHERE project_settings.key GLOB 'quick_list_slot_[1-9]'
+                  AND list_items.media_id IN ({placeholders})
+                ORDER BY list_items.media_id, slot
+                """,
+                tuple(chunk),
+            )
+            for row in rows:
+                mapping[int(row[0])].append(int(row[1]))
+        return mapping
