@@ -100,6 +100,32 @@ def test_ensure_empty_slot_auto_creates_named_list(tmp_path: Path) -> None:
     project.close()
 
 
+def test_ensure_quick_slot_uses_existing_nth_list(tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    lists = ListService(project)
+    first = lists.create("宣传")
+    second = lists.create("网站")
+    third = lists.create("活动")
+    ordered = [int(row["id"]) for row in lists.all_lists()]
+    assert lists.ensure_quick_slot(1) == ordered[0]
+    assert lists.ensure_quick_slot(2) == ordered[1]
+    assert lists.ensure_quick_slot(3) == ordered[2]
+    names = {int(row["id"]): str(row["name"]) for row in lists.all_lists()}
+    assert "快捷名单 1" not in names.values()
+    assert lists.quick_slot_list_id(1) == ordered[0]
+    project.close()
+
+
+def test_ensure_quick_slot_still_creates_when_no_nth_list(tmp_path: Path) -> None:
+    project = create_project(tmp_path / "proj")
+    lists = ListService(project)
+    lists.create("网站")
+    created = lists.ensure_quick_slot(5)
+    row = next(r for r in lists.all_lists() if int(r["id"]) == created)
+    assert row["name"] == "快捷名单 5"
+    project.close()
+
+
 def test_rebind_moves_slot_without_changing_membership(tmp_path: Path) -> None:
     project, ids = _setup(tmp_path)
     lists = ListService(project)

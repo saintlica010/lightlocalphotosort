@@ -141,6 +141,12 @@ class ListService:
         existing = self.quick_slot_list_id(slot)
         if existing is not None:
             return existing
+        rows = self._lists.list_all()
+        if len(rows) >= slot:
+            candidate_id = int(rows[slot - 1]["id"])
+            if candidate_id not in self.quick_slots_by_list_id():
+                self.bind_quick_slot(slot, candidate_id)
+                return candidate_id
         list_id = self.create(f"快捷名单 {slot}")
         self.bind_quick_slot(slot, list_id)
         return list_id
