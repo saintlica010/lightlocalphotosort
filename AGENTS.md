@@ -314,12 +314,13 @@ Read these files before implementation when they exist:
 
 ```text
 AGENTS.md
-docs/PHASE2_PLAN.md
+docs/PHASE3_PLAN.md
 lightphotosprt/SKILL.md
 lightphotosprt/REQUIREMENTS_SUMMARY.md
 REQUIREMENTS_SUMMARY.md
 SKILL.md
 DECISIONS.md
+docs/PHASE2_PLAN.md
 ```
 
 Do not assume every file exists in both locations.
@@ -330,8 +331,9 @@ Priority in case of conflict:
 
 ```text
 AGENTS.md
-→ docs/PHASE2_PLAN.md
+→ docs/PHASE3_PLAN.md
 → DECISIONS.md
+→ docs/PHASE2_PLAN.md
 → explicit local requirements
 → SKILL.md
 ```
@@ -1157,9 +1159,11 @@ Tests must never rename, move, modify, or delete media outside their temporary f
 
 ---
 
-## 31. Phase 2 — Keyboard-First Culling and Portable Lists
+## 31. Phase 2 — Keyboard-First Culling and Portable Lists (Historical)
 
-The detailed plan is `docs/PHASE2_PLAN.md`. Implement it in gated milestones and do not begin a later milestone until the preceding gate has been independently reviewed.
+Phase 2 is the completed historical baseline. Its detailed plan remains in
+`docs/PHASE2_PLAN.md` for regression context. The active implementation plan
+is `docs/PHASE3_PLAN.md`; do not treat Phase 2 as the current milestone.
 
 ### 31.1 Phase 2A — Culling Core
 
