@@ -59,6 +59,20 @@ def test_stylesheet_is_token_driven_and_has_no_animation() -> None:
     assert "qfluent" not in lowered
 
 
+def test_stylesheet_menu_items_have_padding_and_text_color() -> None:
+    sheet = stylesheet(TOKENS)
+    assert "QMenu::item" in sheet
+    assert f"color: {TOKENS.text}" in sheet
+    assert "padding" in sheet.split("QMenu::item", 1)[1].split("}", 1)[0]
+
+
+def test_stylesheet_message_box_labels_use_text_token() -> None:
+    sheet = stylesheet(TOKENS)
+    assert "QMessageBox QLabel" in sheet
+    block = sheet.split("QMessageBox QLabel", 1)[1].split("}", 1)[0]
+    assert TOKENS.text in block
+
+
 def test_prototype_uses_tokens_without_touching_main_window(qtbot) -> None:
     window = MainWindow()
     qtbot.addWidget(window)

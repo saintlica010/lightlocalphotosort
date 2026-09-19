@@ -18,7 +18,6 @@ def warning_box(parent: QWidget | None, title: str, text: str) -> QMessageBox:
     """
     box = QMessageBox(parent)
     box.setStyleSheet(stylesheet())
-    box.setStyleSheet(stylesheet())
     box.setIcon(QMessageBox.Icon.Warning)
     box.setWindowTitle(title)
     box.setText(text)

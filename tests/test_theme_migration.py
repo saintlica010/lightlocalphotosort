@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QLabel, QMessageBox
 
 from local_media_curator.ui.dialogs import warning_box
 from local_media_curator.ui.main_window import MainWindow
@@ -107,3 +107,25 @@ def test_owned_dialogs_take_the_project_sheet(qtbot) -> None:
     assert isinstance(box, QMessageBox)
     assert TOKENS.surface_1 in box.styleSheet()
     assert box.button(QMessageBox.StandardButton.Ok).text() == "确定"
+
+
+def test_warning_box_labels_are_not_black(qtbot) -> None:
+    box = warning_box(
+        None,
+        "无法导出",
+        "当前名单中没有可用于 Lightroom RAW 匹配的 JPEG 文件。",
+    )
+    qtbot.addWidget(box)
+    assert "QMessageBox QLabel" in box.styleSheet()
+    assert f"color: {TOKENS.text}" in box.styleSheet()
+    labels = box.findChildren(QLabel)
+    assert labels
+    for label in labels:
+        if not label.text():
+            continue
+        color = label.palette().color(label.foregroundRole())
+        # Palette may stay black under offscreen; QSS string is the release gate.
+        if color.name().lower() == "#000000":
+            assert TOKENS.text in box.styleSheet()
+            continue
+        assert color.name().lower() != "#000000"

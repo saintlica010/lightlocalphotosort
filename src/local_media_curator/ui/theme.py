@@ -148,9 +148,27 @@ QMenuBar, QMenu, QStatusBar {{
   color: {t.text};
   font-size: {t.font_size_md}px;
 }}
-QMenuBar::item:selected, QMenu::item:selected, QMenu::item:hover {{
+QMenu::item {{
+  color: {t.text};
+  padding: {t.space_xs}px {t.space_lg}px {t.space_xs}px {t.space_md}px;
+  min-height: {t.line_height}px;
+}}
+QMenu::item:selected, QMenu::item:hover {{
   background: {t.selection};
   color: {t.text};
+}}
+QMenu::separator {{
+  height: {t.border_width}px;
+  background: {t.border};
+  margin: {t.space_xs}px {t.space_sm}px;
+}}
+QMenuBar::item:selected {{
+  background: {t.selection};
+  color: {t.text};
+}}
+QMessageBox QLabel, QInputDialog QLabel {{
+  color: {t.text};
+  background: transparent;
 }}
 QPushButton {{
   background: {t.surface_2};
