@@ -87,42 +87,21 @@ def test_delete_bound_list_clears_slot(tmp_path: Path) -> None:
     project.close()
 
 
-def test_ensure_empty_slot_auto_creates_named_list(tmp_path: Path) -> None:
-    project, _ids = _setup(tmp_path)
-    lists = ListService(project)
-    list_id = lists.ensure_quick_slot(4)
-    row = next(row for row in lists.all_lists() if int(row["id"]) == list_id)
-    assert row["name"] == "快捷名单 4"
-    assert lists.quick_slot_list_id(4) == list_id
-    again = lists.ensure_quick_slot(4)
-    assert again == list_id
-    assert [str(row["name"]) for row in lists.all_lists()].count("快捷名单 4") == 1
-    project.close()
+def test_ensure_quick_slot_api_removed() -> None:
+    assert not hasattr(ListService, "ensure_quick_slot")
 
 
-def test_ensure_quick_slot_uses_existing_nth_list(tmp_path: Path) -> None:
+def test_named_lists_without_bindings_leave_slots_unbound(tmp_path: Path) -> None:
     project = create_project(tmp_path / "proj")
     lists = ListService(project)
-    first = lists.create("宣传")
-    second = lists.create("网站")
-    third = lists.create("活动")
-    ordered = [int(row["id"]) for row in lists.all_lists()]
-    assert lists.ensure_quick_slot(1) == ordered[0]
-    assert lists.ensure_quick_slot(2) == ordered[1]
-    assert lists.ensure_quick_slot(3) == ordered[2]
-    names = {int(row["id"]): str(row["name"]) for row in lists.all_lists()}
-    assert "快捷名单 1" not in names.values()
-    assert lists.quick_slot_list_id(1) == ordered[0]
-    project.close()
-
-
-def test_ensure_quick_slot_still_creates_when_no_nth_list(tmp_path: Path) -> None:
-    project = create_project(tmp_path / "proj")
-    lists = ListService(project)
+    lists.create("宣传")
     lists.create("网站")
-    created = lists.ensure_quick_slot(5)
-    row = next(r for r in lists.all_lists() if int(r["id"]) == created)
-    assert row["name"] == "快捷名单 5"
+    lists.create("活动")
+
+    assert [lists.quick_slot_list_id(slot) for slot in range(1, 10)] == [None] * 9
+    names = {str(row["name"]) for row in lists.all_lists()}
+    assert names == {"宣传", "网站", "活动"}
+    assert not any(name.startswith("快捷名单 ") for name in names)
     project.close()
 
 

@@ -137,20 +137,6 @@ class ListService:
         self._settings.delete(_quick_slot_key(slot))
         self._project.connection.commit()
 
-    def ensure_quick_slot(self, slot: int) -> int:
-        existing = self.quick_slot_list_id(slot)
-        if existing is not None:
-            return existing
-        rows = self._lists.list_all()
-        if len(rows) >= slot:
-            candidate_id = int(rows[slot - 1]["id"])
-            if candidate_id not in self.quick_slots_by_list_id():
-                self.bind_quick_slot(slot, candidate_id)
-                return candidate_id
-        list_id = self.create(f"快捷名单 {slot}")
-        self.bind_quick_slot(slot, list_id)
-        return list_id
-
     def _require_quick_slot(self, slot: int) -> None:
         if slot < 1 or slot > 9:
             raise ValueError("快捷名单槽位必须是 1 到 9。")
