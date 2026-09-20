@@ -117,10 +117,15 @@ def test_shift_number_advances_when_already_member(qtbot, tmp_path: Path) -> Non
 def test_number_shortcuts_ignored_in_text_editors(
     qtbot, tmp_path: Path, editor_factory
 ) -> None:
-    project, ids = _setup(tmp_path, ("A.jpg",))
+    project, ids = _setup(tmp_path, ("A.jpg", "B.jpg"))
     window = _window(qtbot, project)
     window.show()
     qtbot.wait(10)
+    slot_one = window.list_service.create("网站")
+    slot_two = window.list_service.create("首页候选")
+    window.list_service.bind_quick_slot(1, slot_one)
+    window.list_service.bind_quick_slot(2, slot_two)
+    window.refresh()
     window._select_media_ids([ids["A.jpg"]])
     editor = editor_factory(window)
     qtbot.addWidget(editor)
@@ -135,15 +140,21 @@ def test_number_shortcuts_ignored_in_text_editors(
 
     window.quick_slot_actions[0].trigger()
     window.quick_slot_shift_actions[1].trigger()
-    assert window.list_service.all_lists() == []
+    assert window.list_service.ordered_media_ids(slot_one) == []
+    assert window.list_service.ordered_media_ids(slot_two) == []
+    assert window.media_grid.selected_ids() == [ids["A.jpg"]]
+    assert _current_id(window) == ids["A.jpg"]
     project.close()
 
 
 def test_number_shortcuts_ignored_in_editable_combobox(qtbot, tmp_path: Path) -> None:
-    project, ids = _setup(tmp_path, ("A.jpg",))
+    project, ids = _setup(tmp_path, ("A.jpg", "B.jpg"))
     window = _window(qtbot, project)
     window.show()
     qtbot.wait(10)
+    slot_three = window.list_service.create("网站")
+    window.list_service.bind_quick_slot(3, slot_three)
+    window.refresh()
     window._select_media_ids([ids["A.jpg"]])
     combo = QComboBox(window)
     combo.setEditable(True)
@@ -155,7 +166,9 @@ def test_number_shortcuts_ignored_in_editable_combobox(qtbot, tmp_path: Path) ->
 
     window.quick_slot_actions[2].trigger()
     window.quick_slot_shift_actions[2].trigger()
-    assert window.list_service.all_lists() == []
+    assert window.list_service.ordered_media_ids(slot_three) == []
+    assert window.media_grid.selected_ids() == [ids["A.jpg"]]
+    assert _current_id(window) == ids["A.jpg"]
     project.close()
 
 
