@@ -69,6 +69,30 @@ def test_shift_number_adds_and_advances(qtbot, tmp_path: Path) -> None:
     project.close()
 
 
+def test_unbound_shift_number_does_not_create_list(qtbot, tmp_path: Path) -> None:
+    project, ids = _setup(tmp_path, ("A.jpg", "B.jpg"))
+    window = _window(qtbot, project)
+    window._select_media_ids([ids["A.jpg"]])
+    window.quick_slot_shift_actions[0].trigger()
+    assert window.list_service.all_lists() == []
+    assert window.list_service.quick_slot_list_id(1) is None
+    assert "尚未绑定" in window.statusBar().currentMessage()
+    project.close()
+
+
+def test_unbound_shift_number_does_not_advance(qtbot, tmp_path: Path) -> None:
+    project, _ids = _setup(tmp_path)
+    window = _window(qtbot, project)
+    first = _visible_id(window, 0)
+    window._select_media_ids([first])
+    assert _current_id(window) == first
+    window.quick_slot_shift_actions[2].trigger()
+    assert window.list_service.all_lists() == []
+    assert window.list_service.quick_slot_list_id(3) is None
+    assert _current_id(window) == first
+    project.close()
+
+
 def test_shift_number_advances_when_already_member(qtbot, tmp_path: Path) -> None:
     project, _ids = _setup(tmp_path)
     window = _window(qtbot, project)

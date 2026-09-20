@@ -137,6 +137,31 @@ def test_unbound_number_key_does_not_create_list(qtbot, tmp_path: Path) -> None:
     project.close()
 
 
+def test_unbound_number_key_does_not_change_membership(qtbot, tmp_path: Path) -> None:
+    project, ids = _setup(tmp_path, ("A.jpg", "B.jpg"))
+    window = _window(qtbot, project)
+    website = window.list_service.create("网站")
+    window.list_service.add_items(website, [ids["A.jpg"]])
+    before = window.list_service.ordered_media_ids(website)
+    window._select_media_ids([ids["B.jpg"]])
+    window.quick_slot_actions[2].trigger()
+    assert window.list_service.ordered_media_ids(website) == before
+    assert window.list_service.quick_slot_list_id(3) is None
+    assert ids["B.jpg"] not in window.list_service.ordered_media_ids(website)
+    project.close()
+
+
+def test_unbound_number_key_shows_status_message(qtbot, tmp_path: Path) -> None:
+    project, ids = _setup(tmp_path, ("A.jpg",))
+    window = _window(qtbot, project)
+    window._select_media_ids([ids["A.jpg"]])
+    window.quick_slot_actions[4].trigger()
+    message = window.statusBar().currentMessage()
+    assert "尚未绑定" in message
+    assert message == "快捷键 5 尚未绑定。请在左侧名单上右键或点「绑定快捷键」。"
+    project.close()
+
+
 def test_number_key_adds_to_user_bound_list(qtbot, tmp_path: Path) -> None:
     project, ids = _setup(tmp_path, ("A.jpg",))
     window = _window(qtbot, project)
