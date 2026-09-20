@@ -32,7 +32,7 @@ python -m local_media_curator
 2. **Add Source Folder**, then **Scan** (F5). The status bar shows `正在扫描… 已处理 {n:,} 个文件` while working. Source files are never moved, renamed, or rewritten.
 3. Browse All / Unassigned / Picked / Undecided / Rejected, or create named virtual lists. Filter the grid with the four combos (type, extension, source folder, missing/present); filtering never rewrites a list's manual order.
 4. Cull keyboard-first: `P` picked, `X` rejected, `U` undecided (`Shift` variants advance); set a Target List and press `B` to toggle membership (`Shift+B` adds and advances). Reorder a named list with `[` / `]` or Ctrl+Up/Down, and undo.
-5. Quick lists: press `1`–`9` to add the selection to that slot (an empty slot creates `快捷名单 N`), or `Shift+1`–`9` to add and advance. Bind or clear a slot from the list context menu. Slot numbers show on the list row and on the grid card. Typing a number in a text field does not fire the shortcut.
+5. Quick lists: bind a named list to a slot from the list context menu, then press `1`–`9` to add the selection (or `Shift+1`–`9` to add and advance). Unbound slots do nothing except a status-bar hint to bind first. Slot numbers show on the list row and on the grid card. Typing a number in a text field does not fire the shortcut.
 6. Export a list without touching source files: **导出名单...** (`.llplist.json`, exact order round-trip across machines), **导出 CSV...**, **导出 TXT...**, or **复制文件名** / **复制绝对路径** / **复制相对路径**. **导出 Lightroom 智能收藏夹（实验性）...** writes only a `.lrsmcol` file. Import with **导入名单...**; missing and ambiguous items are reported, never silently matched.
 
 ## Packaged Windows build

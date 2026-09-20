@@ -127,9 +127,9 @@ Follow `docs/PHASE3_PLAN.md` §7. One focused commit stream per milestone. TDD.
 
 ### 3A — Quick List Core
 
-Persistent slots `1..9`. Service bind/unbind/resolve. Empty slot auto-creates `快捷名单 N`. `1..9` idempotent add (multi-select = one undo unit). List delete clears the slot. Rename preserves the slot. Reassignment does not change membership.
+Persistent slots `1..9`. Service bind/unbind/resolve. Unbound slots require explicit bind (no auto-create / no Nth-list auto-bind). `1..9` idempotent add when bound (multi-select = one undo unit). List delete clears the slot and leaves it unbound. Rename preserves the slot. Reassignment does not change membership.
 
-Gate: slot persistence, auto-create, rename/delete, add, multi-select, idempotent repeat, Phase 1/2 regression.
+Gate: slot persistence, unbound key does not create or auto-bind, rename/delete, add when bound, multi-select, idempotent repeat, Phase 1/2 regression.
 
 ### 3B — Quick List Keyboard/UI
 

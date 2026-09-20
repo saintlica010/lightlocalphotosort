@@ -109,7 +109,7 @@ Windows one-folder PyInstaller build. Spec: `build/local_media_curator.spec`. En
 
 ## Quick lists
 
-Slots `1..9` are `project_settings` keys `quick_list_slot_1` … `quick_list_slot_9`. Values are list ids. Schema stays at version 2. `ListService` binds, unbinds, and auto-creates `快捷名单 N`. Membership is still `list_items`. The grid badge is a projection of that membership (`QuickSlotsRole`), not a second store. Number shortcuts live on the Edit menu and no-op while a text editor or editable combo has focus.
+Slots `1..9` are `project_settings` keys `quick_list_slot_1` … `quick_list_slot_9`. Values are list ids. Schema stays at version 2. `ListService` binds and unbinds slots explicitly; unbound number keys do not create lists or auto-bind. Membership is still `list_items`. The grid badge is a projection of that membership (`QuickSlotsRole`), not a second store. Number shortcuts live on the Edit menu and no-op while a text editor or editable combo has focus, and while the target slot is unbound.
 
 ## Lightroom smart collection
 

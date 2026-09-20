@@ -33,8 +33,8 @@ The Phase 3 product objective is:
 | Area | Phase 3 | Notes |
 |---|---:|---|
 | Quick List slots `1..9` | Yes | Stable project-level bindings |
-| Auto-create missing quick lists | Yes | `快捷名单 N` |
-| `Shift+1..9` add-and-advance | Yes | Keyboard-first workflow |
+| Explicit quick-slot binding | Yes | Unbound `1..9` do not create or auto-bind |
+| `Shift+1..9` add-and-advance | Yes | Keyboard-first workflow; bound slots only |
 | Multi-selection quick-list add | Yes | One logical action |
 | Quick-slot persistence | Yes | Survives restart |
 | Quick-slot reassignment UI | Yes | Explicit, no silent overwrite |
@@ -220,36 +220,21 @@ Optional shortcuts such as `Alt+1..9` for removal are **not required** in the fi
 
 ---
 
-## 3.4 Auto-create missing quick lists
+## 3.4 Unbound quick slots
 
-If the user presses a number whose slot has no list:
+Quick slots require explicit binding.
 
-```text
-press 4
-```
+If the user presses `1..9` and that slot is unbound:
 
-the application must automatically create:
+- do not create a list;
+- do not bind an existing list automatically;
+- do not change list membership;
+- do not advance;
+- show a non-blocking Simplified Chinese status message explaining that the slot must be bound first.
 
-```text
-快捷名单 4
-```
+Quick-slot bindings are created only through explicit user actions in the list UI.
 
-bind it to slot 4, and add the current selection.
-
-No confirmation dialog is required for this auto-create path.
-
-The user may later rename:
-
-```text
-快捷名单 4
-→ 社交媒体
-```
-
-The slot binding must survive the rename:
-
-```text
-4 → 社交媒体
-```
+Users create normal named lists with the existing list creation UI, then bind those lists to `1..9`.
 
 ---
 
@@ -260,16 +245,13 @@ If a list bound to a quick slot is deleted, deleting that list must clear the sl
 After deletion:
 
 ```text
-press 4
+delete bound list
+→ clear binding
+→ slot remains unbound
+→ number key does nothing until explicit rebind
 ```
 
-must create a new:
-
-```text
-快捷名单 4
-```
-
-rather than referencing a stale list ID.
+Pressing the same number must **not** recreate a list and must **not** bind another existing list. The slot stays empty until the user explicitly binds another list.
 
 ---
 
@@ -917,10 +899,10 @@ Implement:
 
 - persistent slots `1..9`;
 - service API for bind/unbind/resolve;
-- auto-create `快捷名单 N`;
-- `1..9` idempotent add;
+- unbound slots require explicit bind (no auto-create);
+- `1..9` idempotent add when bound;
 - multi-selection add;
-- list delete clears binding;
+- list delete clears binding and leaves the slot unbound;
 - rename preserves binding;
 - Undo integration where appropriate.
 
@@ -930,10 +912,10 @@ Must pass:
 
 ```text
 slot persistence
-auto-create
+unbound key does not create or auto-bind
 rename preserves binding
-delete clears binding
-1..9 add
+delete clears binding and leaves slot unbound
+1..9 add when bound
 multi-selection add
 repeated key is idempotent
 Phase 1/2 regression
@@ -1078,10 +1060,11 @@ test_slot_binding_persists_after_reopen
 test_rename_preserves_quick_slot
 
 test_delete_bound_list_clears_slot
+test_delete_bound_list_leaves_slot_unbound
 
-test_number_key_auto_creates_missing_list
-test_auto_created_list_has_expected_name
-test_auto_created_list_binds_correct_slot
+test_unbound_number_key_does_not_create_or_bind
+test_unbound_shift_number_does_not_advance
+test_ensure_quick_slot_api_removed
 
 test_number_key_adds_selection
 test_number_key_is_idempotent
@@ -1159,14 +1142,14 @@ The final Windows packaged build should manually verify at least:
 3. existing named lists remain;
 4. existing manual ordering remains;
 5. Target List remains correct;
-6. press `1` with slot 1 empty → `快捷名单 1` is created;
-7. selected photo enters slot 1 list;
+6. press `1` with slot 1 unbound → no list created, no membership change, no advance, Chinese status message displayed;
+7. explicitly bind an existing list to slot 1; press `1` → selected photo enters that list;
 8. press `1` again → item remains in list;
-9. press `2..9` as representative checks;
+9. press `2..9` as representative checks on bound slots;
 10. multi-select + number adds all selected items;
-11. `Shift+number` adds and advances;
+11. `Shift+number` adds and advances when bound; unbound `Shift+number` does not advance;
 12. rename a quick list and verify slot remains;
-13. delete a quick list and verify slot clears;
+13. delete a quick list → slot clears and stays unbound; press that number → nothing is recreated;
 14. reassign a slot through UI;
 15. type numbers in a text field and confirm no quick-list action occurs;
 16. slot numbers appear correctly in the sidebar;
@@ -1200,17 +1183,20 @@ Phase 3 may merge only when all **repository-owned** requirements are satisfied.
 
 ## Quick List
 
-- [x] Quick slots `1..9` are stable and persistent
-- [x] Empty slot auto-creates `快捷名单 N`
-- [x] Number shortcuts add idempotently
-- [x] Multi-selection quick add works
-- [x] `Shift+1..9` add-and-advance works
-- [x] Rename preserves slot
-- [x] Delete clears slot
-- [x] Slot reassignment does not alter list membership
-- [x] Text-entry focus prevents numeric shortcut misfires
-- [x] Slot indicators are correct
-- [x] Grid quick-membership indicators are correct
+- [ ] Quick slots `1..9` are stable and persistent
+- [ ] Quick slots require explicit user binding
+- [ ] Unbound `1..9` does not create or auto-bind lists
+- [ ] Unbound `Shift+1..9` does not advance
+- [ ] Number shortcuts add idempotently when bound
+- [ ] Multi-selection quick add works
+- [ ] `Shift+1..9` add-and-advance works when bound
+- [ ] Rename preserves slot binding
+- [ ] Delete clears slot and leaves it unbound
+- [ ] Slot reassignment does not alter list membership
+- [ ] Occupied-slot reassignment requires confirmation
+- [ ] Text-entry focus prevents numeric shortcut misfires
+- [ ] Slot indicators are correct
+- [ ] Grid quick-membership indicators are correct
 
 ## Lightroom exporter
 

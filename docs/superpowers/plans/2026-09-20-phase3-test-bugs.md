@@ -1,5 +1,12 @@
 # Phase 3 Test-Bug Fixes Implementation Plan
 
+> **SUPERSEDED.** This plan's Task 2 auto-create / Nth-list bind path is obsolete.
+> Current product policy requires explicit quick-slot binding only (no auto-create
+> `快捷名单 N`, no Nth-list auto-bind). See
+> `docs/PHASE3_MANUAL_QUICK_SLOT_FINAL_FIX.md` and
+> `docs/superpowers/plans/2026-09-20-phase3-manual-quick-slot-final.md`.
+> Historical wording below is retained for audit only.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix three user-reported Phase 3 test issues: misaligned context-menu text, unreadable black warning/error text on the dark theme, and number keys 1–9 creating `快捷名单 N` instead of using the user's existing named lists.
