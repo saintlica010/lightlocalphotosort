@@ -1258,7 +1258,7 @@ Windows verification below for the current repository-owned evidence.
 
 Current repository-owned Windows evidence is in
 `docs/verification/phase3_windows_smoke.md` on branch `fix/phase3-test-bugs`
-(verified commit `8b370e4277ab2e0cd4da379d78d121c87bf0a9f9`; code HEAD before
+(verified commit `710ea9b5dd30d6112ae67225a28bedc121e136db`; code HEAD before
 the docs commit: `5ee3c6d01926b6add28d950d67d4cd94e3e3398d`). It records
 **291 passed**,
 explicit quick-slot bind/unbound/delete policy coverage, the populated

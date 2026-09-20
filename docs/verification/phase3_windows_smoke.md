@@ -4,7 +4,7 @@
 
 Branch: `fix/phase3-test-bugs`
 
-Verified commit: `8b370e4277ab2e0cd4da379d78d121c87bf0a9f9`
+Verified commit: `710ea9b5dd30d6112ae67225a28bedc121e136db`
 
 Code HEAD immediately before this verification-docs commit:
 `5ee3c6d01926b6add28d950d67d4cd94e3e3398d`
