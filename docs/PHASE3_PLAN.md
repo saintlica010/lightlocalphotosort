@@ -1183,20 +1183,20 @@ Phase 3 may merge only when all **repository-owned** requirements are satisfied.
 
 ## Quick List
 
-- [ ] Quick slots `1..9` are stable and persistent
-- [ ] Quick slots require explicit user binding
-- [ ] Unbound `1..9` does not create or auto-bind lists
-- [ ] Unbound `Shift+1..9` does not advance
-- [ ] Number shortcuts add idempotently when bound
-- [ ] Multi-selection quick add works
-- [ ] `Shift+1..9` add-and-advance works when bound
-- [ ] Rename preserves slot binding
-- [ ] Delete clears slot and leaves it unbound
-- [ ] Slot reassignment does not alter list membership
-- [ ] Occupied-slot reassignment requires confirmation
-- [ ] Text-entry focus prevents numeric shortcut misfires
-- [ ] Slot indicators are correct
-- [ ] Grid quick-membership indicators are correct
+- [x] Quick slots `1..9` are stable and persistent
+- [x] Quick slots require explicit user binding
+- [x] Unbound `1..9` does not create or auto-bind lists
+- [x] Unbound `Shift+1..9` does not advance
+- [x] Number shortcuts add idempotently when bound
+- [x] Multi-selection quick add works
+- [x] `Shift+1..9` add-and-advance works when bound
+- [x] Rename preserves slot binding
+- [x] Delete clears slot and leaves it unbound
+- [x] Slot reassignment does not alter list membership
+- [x] Occupied-slot reassignment requires confirmation
+- [x] Text-entry focus prevents numeric shortcut misfires
+- [x] Slot indicators are correct
+- [x] Grid quick-membership indicators are correct
 
 ## Lightroom exporter
 
@@ -1224,13 +1224,13 @@ Phase 3 may merge only when all **repository-owned** requirements are satisfied.
 
 ## Regression / safety
 
-- [x] Full automated suite passes on Windows Python 3.12 (`280 passed`)
+- [x] Full automated suite passes on Windows Python 3.12 (`291 passed`)
 - [x] Phase 1 regression requirements pass in the automated suite
 - [x] Phase 2 regression requirements pass in the automated suite
 - [x] Source-media immutability holds
 - [x] Protected data is absent from Git
 - [x] Protected data is absent from packaged build
-- [ ] Windows packaged-EXE smoke passes
+- [x] Windows packaged-EXE smoke passes
 - [ ] Independent review is complete
 
 
@@ -1256,15 +1256,20 @@ Windows verification below for the current repository-owned evidence.
 
 ### Final Windows verification (not a merge)
 
-The historical Linux record above is superseded for current Windows evidence
-by `docs/verification/phase3_windows_smoke.md`. The verified code revision is
-`4c38d0dcf6092c6cf5b3f756f51715013262c3c4` on `codex/phase3`. It records
-`280 passed`, the
-populated 10k/9-slot structural regression, a successful clean PyInstaller
-build, an EXE launch and normal exit, and a package/Git protected-data audit.
-It deliberately leaves the interactive packaged workflow, packaged
-`.lrsmcol` generation, independent review, and Lightroom Classic import
-unchecked.
+Current repository-owned Windows evidence is in
+`docs/verification/phase3_windows_smoke.md` on branch `fix/phase3-test-bugs`
+(verified commit `8b370e4277ab2e0cd4da379d78d121c87bf0a9f9`; code HEAD before
+the docs commit: `5ee3c6d01926b6add28d950d67d4cd94e3e3398d`). It records
+**291 passed**,
+explicit quick-slot bind/unbound/delete policy coverage, the populated
+10k/9-slot structural regression, a successful PyInstaller one-folder build,
+an EXE launch with no ICU/Qt stderr, and a Git protected-data audit. Packaged
+interactive keypress walkthrough and packaged `.lrsmcol` generation were not
+fully exercised in the GUI; Independent Review remains open; Lightroom Classic
+real import remains **NOT TESTED — NON-BLOCKING**.
+
+Historical superseded Windows run (retained in the smoke doc): `codex/phase3`
+at `4c38d0dcf6092c6cf5b3f756f51715013262c3c4` with `280 passed`.
 
 ---
 
