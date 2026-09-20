@@ -206,9 +206,14 @@ class ListService:
             raise
 
     def delete(self, list_id: int) -> None:
-        self._clear_quick_slots_for(list_id)
-        self._lists.delete(list_id)
-        self._project.connection.commit()
+        conn = self._project.connection
+        try:
+            self._clear_quick_slots_for(list_id)
+            self._lists.delete(list_id)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
     def add_items(self, list_id: int, media_ids: list[int]) -> None:
         self._lists.add_items(list_id, media_ids, _now_iso())

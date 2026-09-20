@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
+import pytest
 from PIL import Image
 from PySide6.QtGui import QKeySequence
 
+from local_media_curator.db.repositories import ListRepository
 from local_media_curator.services.library_service import LibraryService
 from local_media_curator.services.list_service import ListService
 from local_media_curator.services.project_service import create_project, open_project
@@ -81,9 +84,54 @@ def test_delete_bound_list_clears_slot(tmp_path: Path) -> None:
     lists = ListService(project)
     list_id = lists.create("快捷名单 4")
     lists.bind_quick_slot(4, list_id)
+    lists.set_target_list(list_id)
     lists.add_items(list_id, [ids["A.jpg"]])
     lists.delete(list_id)
     assert lists.quick_slot_list_id(4) is None
+    assert lists.target_list_id() is None
+    project.close()
+
+
+def test_delete_rolls_back_on_failure(tmp_path: Path, monkeypatch) -> None:
+    project, _ids = _setup(tmp_path)
+    lists = ListService(project)
+    list_id = lists.create("网站")
+    lists.bind_quick_slot(4, list_id)
+    lists.set_target_list(list_id)
+
+    original = ListRepository.delete
+
+    def boom(self, deleted_id: int) -> None:
+        original(self, deleted_id)
+        raise sqlite3.OperationalError("forced delete failure")
+
+    monkeypatch.setattr(ListRepository, "delete", boom)
+
+    with pytest.raises(sqlite3.OperationalError, match="forced delete failure"):
+        lists.delete(list_id)
+
+    conn = project.connection
+    assert (
+        conn.execute("SELECT COUNT(*) FROM lists WHERE id = ?", (list_id,)).fetchone()[0]
+        == 1
+    )
+    assert (
+        conn.execute(
+            "SELECT value FROM project_settings WHERE key = ?",
+            ("quick_list_slot_4",),
+        ).fetchone()[0]
+        == str(list_id)
+    )
+    assert (
+        conn.execute(
+            "SELECT value FROM project_settings WHERE key = ?",
+            ("target_list_id",),
+        ).fetchone()[0]
+        == str(list_id)
+    )
+    assert lists.quick_slot_list_id(4) == list_id
+    assert lists.target_list_id() == list_id
+    assert any(int(row["id"]) == list_id for row in lists.all_lists())
     project.close()
 
 
