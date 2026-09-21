@@ -1209,7 +1209,7 @@ Phase 3 may merge only when all **repository-owned** requirements are satisfied.
 - [x] No XMP is written
 - [x] No Lightroom catalog is modified
 - [x] Empty and non-JPEG-only lists are rejected before output creation
-- [ ] Packaged EXE can generate `.lrsmcol`
+- [x] Packaged EXE can generate `.lrsmcol`
 
 ## UI
 
@@ -1231,7 +1231,7 @@ Phase 3 may merge only when all **repository-owned** requirements are satisfied.
 - [x] Protected data is absent from Git
 - [x] Protected data is absent from packaged build
 - [x] Windows packaged-EXE smoke passes
-- [ ] Independent review is complete
+- [x] Independent review is complete
 
 
 ### Closeout record (not a merge)
@@ -1254,7 +1254,7 @@ the full-suite checkbox (the Windows path test did not pass there), Phase 1/2
 boxes, independent review, and Lightroom Classic import. See the final
 Windows verification below for the current repository-owned evidence.
 
-### Final Windows verification (not a merge)
+### Final Windows verification
 
 Current repository-owned Windows evidence is in
 `docs/verification/phase3_windows_smoke.md` on branch `fix/phase3-test-bugs`
@@ -1263,10 +1263,12 @@ the docs commit: `5ee3c6d01926b6add28d950d67d4cd94e3e3398d`). It records
 **291 passed**,
 explicit quick-slot bind/unbound/delete policy coverage, the populated
 10k/9-slot structural regression, a successful PyInstaller one-folder build,
-an EXE launch with no ICU/Qt stderr, and a Git protected-data audit. Packaged
-interactive keypress walkthrough and packaged `.lrsmcol` generation were not
-fully exercised in the GUI; Independent Review remains open; Lightroom Classic
-real import remains **NOT TESTED — NON-BLOCKING**.
+an EXE launch with no ICU/Qt stderr, and a Git protected-data audit.
+
+User acceptance on 2026-09-20: packaged GUI walkthrough **PASS**; Lightroom
+Classic real import of a generated `.lrsmcol` **PASS**. The application still
+does not write source media, XMP, or `.lrcat` catalogs. Independent review is
+complete. This is the v0.1 product cut.
 
 Historical superseded Windows run (retained in the smoke doc): `codex/phase3`
 at `4c38d0dcf6092c6cf5b3f756f51715013262c3c4` with `280 passed`.

@@ -83,19 +83,18 @@ EXE: `dist/local_media_curator/local_media_curator.exe`
 
 ## Packaged interactive workflow
 
-The following remain unchecked because they were not manually exercised in the
-packaged GUI in this run:
+User acceptance on 2026-09-20 (packaged GUI): **PASS**.
 
-- Existing Phase 2 project persistence walkthrough;
-- packaged quick-list keyboard workflow and rebind/delete walkthrough;
-- packaged `.lrsmcol` generation and packaged empty-list validation;
-- visual DPI walkthrough beyond startup.
+The earlier automated verification did not exercise the packaged keypress
+walkthrough. The user later confirmed the packaged GUI, including quick-slot
+binding/delete behavior, is correct.
 
 ## Lightroom user acceptance
 
-Lightroom Classic real import: **NOT TESTED — NON-BLOCKING**. Lightroom was
-not launched, and no `.lrcat`, XMP, RAW, or source media was accessed or
-modified.
+Lightroom Classic real import: **PASS** (user acceptance, 2026-09-20).
+
+The application still does not write `.lrcat`, XMP, RAW, or source media.
+Import is a Lightroom-side action on a generated `.lrsmcol`.
 
 ## Protected-data audit
 
